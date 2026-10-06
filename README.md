@@ -250,7 +250,7 @@ Quem tem câmeras, fechadura e hub Intelbras quer, num só app, ver a câmera ao
 | RF08 | Itens por página 2/5/10/50, "Carregar mais", "Sem mais informações", contagem; erro ao carregar mais mantém a lista | Feito |
 | RF09 | Histórico com 10 eventos, "Ver mais" com 30; vazio e erro com textos diferentes | Feito |
 
-O roteiro de 19 passos (RF01–RF09) foi executado no Android físico com a API real em 05/10/2026, com comparação lado a lado com as capturas de referência; no iOS, o build assinado roda no iPhone e os fluxos principais foram conferidos no simulador com a API real. Pendentes: token vencido real, modo avião e a repetição completa no iPhone físico (seção "Verificação em aparelho").
+O roteiro de 19 passos (RF01–RF09) foi executado no Android físico com a API real em 05/10/2026, com comparação lado a lado com as capturas de referência; no iOS, o build assinado roda no iPhone e os fluxos principais foram conferidos no simulador com a API real. Pendentes: token vencido real, modo avião e a repetição completa no iPhone físico (detalhes na seção "Verificação em aparelho" do README do repositório).
 
 ### Camadas
 

@@ -1,4 +1,5 @@
 rootProject.name = "MobiSmartCase"
+enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS") // permite implementation(projects.shared)
 
 pluginManagement {
     repositories {
@@ -23,9 +24,9 @@ dependencyResolutionManagement {
                 includeGroupAndSubgroups("com.google")
             }
         }
-        mavenCentral()
+        mavenCentral() // org.jetbrains.* (Compose MP, lifecycle e navigation JetBrains) vêm daqui
     }
 }
 
-include(":androidApp")
 include(":shared")
+include(":androidApp")

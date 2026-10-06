@@ -6,9 +6,13 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import br.com.pompeo.casa.domain.AppError
 import br.com.pompeo.casa.domain.DevicesState
+import br.com.pompeo.casa.domain.model.DeviceKind
 import br.com.pompeo.casa.domain.model.DeviceQuery
+import br.com.pompeo.casa.domain.model.LockVolume
 import br.com.pompeo.casa.domain.model.StreamSession
 import br.com.pompeo.casa.ui.HomeViewModel
+import br.com.pompeo.casa.ui.LockAction
+import br.com.pompeo.casa.ui.LockCommand
 import br.com.pompeo.casa.ui.TokenValidation
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -114,5 +118,87 @@ class HomeViewModelTest {
         // Assert: com runCatching a tentativa cancelada viraria Result.failure("Job was cancelled").
         assertTrue(live.isCompleted)
         assertNull(result, "cancelamento não vira Result.failure")
+    }
+
+    @Test
+    fun doorCommandRunsInViewModelScopeAndReportsDone() = runTest {
+        // Arrange: o comando demora 1 s (tempo virtual).
+        val tokens = FakeTokenRepository("Ot_session_000001")
+        val locks = FakeLockController().apply { commandDelayMs = 1_000 }
+        val vm = homeViewModel(FakeDeviceRepository(tokens, locks = locks), tokens)
+        // Act: sendDoorCommand não suspende; o envio segue no viewModelScope, que a rotação não cancela.
+        vm.sendDoorCommand(device("LOCK1", kind = DeviceKind.LOCK), open = true)
+        // Assert
+        assertEquals(LockCommand.Sending("LOCK1", LockAction.Door(open = true)), vm.lockCommand.value)
+        advanceUntilIdle()
+        assertEquals(LockCommand.Done("LOCK1", LockAction.Door(open = true), error = null), vm.lockCommand.value)
+        assertEquals(listOf(true), locks.doorCommands)
+    }
+
+    @Test
+    fun doorCommandFailureIsReportedAsDoneWithError() = runTest {
+        // Arrange
+        val tokens = FakeTokenRepository("Ot_session_000001")
+        val failure = IllegalStateException("HTTP 500")
+        val locks = FakeLockController().apply { commandError = failure }
+        val vm = homeViewModel(FakeDeviceRepository(tokens, locks = locks), tokens)
+        // Act
+        vm.sendDoorCommand(device("LOCK1", kind = DeviceKind.LOCK), open = false)
+        advanceUntilIdle()
+        // Assert: o texto já vem amigável; a tela só acrescenta "Comando falhou:".
+        assertEquals(LockCommand.Done("LOCK1", LockAction.Door(open = false), error = vm.messageOf(failure)), vm.lockCommand.value)
+    }
+
+    @Test
+    fun volumeCommandReportsTheAppliedVolume() = runTest {
+        // Arrange: a escrita é aceita, mas a releitura falha como o HTTP 500 real.
+        val tokens = FakeTokenRepository("Ot_session_000001")
+        val locks = FakeLockController().apply { readError = IllegalStateException("HTTP 500") }
+        val vm = homeViewModel(FakeDeviceRepository(tokens, locks = locks), tokens)
+        // Act
+        vm.changeLockVolume(device("LOCK1", kind = DeviceKind.LOCK), LockVolume.HIGH)
+        advanceUntilIdle()
+        // Assert: o ChangeLockVolumeUseCase real assume o pedido quando a releitura falha.
+        val expected = LockCommand.Done("LOCK1", LockAction.Volume(LockVolume.HIGH), error = null, appliedVolume = LockVolume.HIGH)
+        assertEquals(expected, vm.lockCommand.value)
+        assertEquals(LockVolume.HIGH, locks.volume)
+    }
+
+    @Test
+    fun secondCommandWhileSendingIsIgnored() = runTest {
+        // Arrange: o 1.º comando demora 1 s (tempo virtual) e ainda está em andamento.
+        val tokens = FakeTokenRepository("Ot_session_000001")
+        val locks = FakeLockController().apply { commandDelayMs = 1_000 }
+        val vm = homeViewModel(FakeDeviceRepository(tokens, locks = locks), tokens)
+        val lock = device("LOCK1", kind = DeviceKind.LOCK)
+        vm.sendDoorCommand(lock, open = true)
+        runCurrent()
+        // Act
+        vm.sendDoorCommand(lock, open = false)
+        vm.changeLockVolume(lock, LockVolume.LOW)
+        advanceUntilIdle()
+        // Assert: só o 1.º chegou à fechadura e é o resultado publicado.
+        assertEquals(listOf(true), locks.doorCommands)
+        assertEquals(LockVolume.MEDIUM, locks.volume)
+        assertEquals(LockCommand.Done("LOCK1", LockAction.Door(open = true), error = null), vm.lockCommand.value)
+    }
+
+    @Test
+    fun handledCommandFreesTheSlotForTheNextOne() = runTest {
+        // Arrange: um comando concluído.
+        val tokens = FakeTokenRepository("Ot_session_000001")
+        val locks = FakeLockController()
+        val vm = homeViewModel(FakeDeviceRepository(tokens, locks = locks), tokens)
+        val lock = device("LOCK1", kind = DeviceKind.LOCK)
+        vm.sendDoorCommand(lock, open = true)
+        advanceUntilIdle()
+        // Act
+        vm.lockCommandHandled()
+        val afterHandled = vm.lockCommand.value
+        vm.sendDoorCommand(lock, open = false)
+        advanceUntilIdle()
+        // Assert
+        assertNull(afterHandled)
+        assertEquals(listOf(true, false), locks.doorCommands)
     }
 }

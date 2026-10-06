@@ -208,7 +208,12 @@ private fun LockScreen(vm: HomeViewModel, lock: Device, snack: Snack, onBack: ()
     var loading by remember(lock.ns) { mutableStateOf(true) }
     var reload by remember(lock.ns) { mutableIntStateOf(0) }
     var confirm by remember { mutableStateOf<Boolean?>(null) } // true = destrancar, false = trancar
-    var sending by remember { mutableStateOf(false) }
+    val command by vm.lockCommand.collectAsStateWithLifecycle()
+    // O ViewModel aceita um comando por vez: com outro em andamento, os controles ficam desabilitados em vez de
+    // o toque confirmado ser ignorado em silêncio.
+    val busy = command is LockCommand.Sending
+    val sendingAction = (command as? LockCommand.Sending)?.takeIf { it.lockNs == lock.ns }?.action
+    val sending = sendingAction is LockAction.Door
     var online by remember(lock.ns) { mutableStateOf(lock.online) }
     // Volume e histórico atualizam só o próprio campo, sem repetir as outras leituras.
     val update: ((LockDetails) -> LockDetails) -> Unit = { f -> details = f(details ?: LockDetails(null, null, null, null, null, emptyList())) }
@@ -222,6 +227,32 @@ private fun LockScreen(vm: HomeViewModel, lock: Device, snack: Snack, onBack: ()
         loading = false
     }
     LaunchedEffect(lock.ns) { vm.isOnline(lock).onSuccess { online = it ?: online } }
+    // Consumido aqui e não no cartão de volume, que sai da composição ao ser recolhido. O Done espera no ViewModel:
+    // se a tela foi recriada no meio do comando (rotação), esta recebe o resultado e relê.
+    LaunchedEffect(command) {
+        val done = (command as? LockCommand.Done)?.takeIf { it.lockNs == lock.ns } ?: return@LaunchedEffect
+        when (done.action) {
+            is LockAction.Door -> {
+                val message = done.error?.let { "Comando falhou: $it" }
+                error = message
+                // A releitura logo abaixo limpa `error` quando dá certo; o Snackbar mantém a falha visível.
+                message?.let { snack(it) }
+                reload++ // relê o estado REAL depois do comando
+            }
+            is LockAction.Volume -> {
+                val failure = done.error
+                val applied = done.appliedVolume
+                when {
+                    failure != null -> snack("Não foi possível alterar o volume: $failure")
+                    applied != null -> {
+                        update { it.copy(volume = applied, volumeError = null) }
+                        snack("Volume alterado para ${applied.label}")
+                    }
+                }
+            }
+        }
+        vm.lockCommandHandled()
+    }
 
     val open = details?.open
     val settled = details != null || !loading // campo que falhou vira texto, não sumiço
@@ -248,7 +279,7 @@ private fun LockScreen(vm: HomeViewModel, lock: Device, snack: Snack, onBack: ()
             LockCircle(
                 open = open,
                 consulting = loading || sending,
-                enabled = !sending,
+                enabled = !busy,
                 onTap = { snack(subtitle ?: stateText) },
                 onLongPress = {
                     when {
@@ -276,7 +307,7 @@ private fun LockScreen(vm: HomeViewModel, lock: Device, snack: Snack, onBack: ()
                 volumeOpen = volumeOpen,
                 onVolume = { volumeOpen = !volumeOpen },
                 onHistory = { scope.launch { scroll.animateScrollTo(historyTop) } },
-            ) { VolumeControls(vm, lock, details, snack, onUpdate = update) }
+            ) { VolumeControls(vm, lock, details, busy = busy, sending = sendingAction is LockAction.Volume, onUpdate = update) }
             Spacer(Modifier.height(16.dp))
             HistoryCard(
                 vm, lock, details, loading, generation = reload, onUpdate = update,
@@ -292,19 +323,7 @@ private fun LockScreen(vm: HomeViewModel, lock: Device, snack: Snack, onBack: ()
             onDismissRequest = { confirm = null }, containerColor = MiboColors.Card,
             title = { Text(if (wantOpen) "Destrancar a fechadura?" else "Trancar a fechadura?") },
             text = { Text(commandNotice(lock)) },
-            confirmButton = { TextButton(onClick = {
-                confirm = null; sending = true
-                scope.launch {
-                    vm.setLock(lock, wantOpen).onSuccess { error = null }.onFailure {
-                        val message = "Comando falhou: ${vm.messageOf(it)}"
-                        error = message
-                        // A releitura logo abaixo limpa `error` quando dá certo; o Snackbar mantém a falha visível.
-                        snack(message)
-                    }
-                    sending = false
-                    reload++ // relê o estado REAL depois do comando
-                }
-            }) { Text("Confirmar") } },
+            confirmButton = { TextButton(onClick = { confirm = null; vm.sendDoorCommand(lock, wantOpen) }) { Text("Confirmar") } },
             dismissButton = { TextButton(onClick = { confirm = null }) { Text("Cancelar") } },
         )
     }
@@ -389,35 +408,30 @@ private fun ActionCircle(icon: ImageVector, label: String, color: Color, onClick
 
 /**
  * Cartão Volume (RF06). A leitura da fechadura de teste responde HTTP 500, por isso os níveis ficam habilitados
- * mesmo sem leitura; mudar o volume age no aparelho real e passa por confirmação (regra 0.2.5).
+ * mesmo sem leitura; mudar o volume age no aparelho real e passa por confirmação (regra 0.2.5). O comando roda no
+ * ViewModel: [sending] = troca de volume desta fechadura em andamento; [busy] = qualquer comando físico em andamento.
  */
 @Composable
-private fun VolumeControls(vm: HomeViewModel, lock: Device, details: LockDetails?, snack: Snack, onUpdate: ((LockDetails) -> LockDetails) -> Unit) {
+private fun VolumeControls(
+    vm: HomeViewModel,
+    lock: Device,
+    details: LockDetails?,
+    busy: Boolean,
+    sending: Boolean,
+    onUpdate: ((LockDetails) -> LockDetails) -> Unit,
+) {
     val scope = rememberCoroutineScope()
-    var changing by remember { mutableStateOf(false) }
+    var rereading by remember { mutableStateOf(false) }
     var pending by remember { mutableStateOf<LockVolume?>(null) } // nível aguardando confirmação
-
-    // O ViewModel chama o ChangeLockVolumeUseCase: grava, relê e, se a releitura falhar, assume o pedido.
-    fun change(level: LockVolume) {
-        changing = true
-        scope.launch {
-            vm.setLockVolume(lock, level)
-                .onSuccess { applied ->
-                    onUpdate { it.copy(volume = applied, volumeError = null) }
-                    snack("Volume alterado para ${applied.label}")
-                }
-                .onFailure { snack("Não foi possível alterar o volume: ${vm.messageOf(it)}") }
-            changing = false
-        }
-    }
+    val idle = !rereading && !busy
 
     fun reread() {
-        changing = true
+        rereading = true
         scope.launch {
             vm.lockVolume(lock)
                 .onSuccess { volume -> onUpdate { it.copy(volume = volume, volumeError = null) } }
                 .onFailure { e -> onUpdate { it.copy(volume = null, volumeError = vm.shortMessageOf(e)) } }
-            changing = false
+            rereading = false
         }
     }
 
@@ -430,7 +444,7 @@ private fun VolumeControls(vm: HomeViewModel, lock: Device, details: LockDetails
                     color = MiboColors.TextSecondary,
                     fontSize = 13.sp,
                 )
-                TextButton(onClick = { reread() }, enabled = !changing) { Text("Tentar de novo") }
+                TextButton(onClick = { reread() }, enabled = idle) { Text("Tentar de novo") }
             }
         }
         SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
@@ -439,7 +453,7 @@ private fun VolumeControls(vm: HomeViewModel, lock: Device, details: LockDetails
                     selected = details?.volume == level,
                     onClick = { if (details?.volume != level) pending = level },
                     shape = SegmentedButtonDefaults.itemShape(index, LockVolume.entries.size),
-                    enabled = details != null && !changing,
+                    enabled = details != null && idle,
                     colors = SegmentedButtonDefaults.colors(
                         activeContainerColor = MiboColors.Green,
                         activeContentColor = Color.White,
@@ -451,7 +465,7 @@ private fun VolumeControls(vm: HomeViewModel, lock: Device, details: LockDetails
                 ) { Text(level.label) }
             }
         }
-        if (changing) {
+        if (rereading || sending) {
             LinearProgressIndicator(Modifier.fillMaxWidth().padding(top = 8.dp), color = MiboColors.Green, trackColor = MiboColors.Divider)
         }
     }
@@ -461,7 +475,7 @@ private fun VolumeControls(vm: HomeViewModel, lock: Device, details: LockDetails
             onDismissRequest = { pending = null }, containerColor = MiboColors.Card,
             title = { Text("Alterar o volume para ${level.label}?") },
             text = { Text(commandNotice(lock)) },
-            confirmButton = { TextButton(onClick = { pending = null; change(level) }) { Text("Confirmar") } },
+            confirmButton = { TextButton(onClick = { pending = null; vm.changeLockVolume(lock, level) }) { Text("Confirmar") } },
             dismissButton = { TextButton(onClick = { pending = null }) { Text("Cancelar") } },
         )
     }

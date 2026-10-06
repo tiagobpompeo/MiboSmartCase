@@ -33,6 +33,29 @@ sealed interface TokenValidation {
     data object Done : TokenValidation
 }
 
+/** Ação física pedida à fechadura: porta (RF05) ou volume (RF06). */
+sealed interface LockAction {
+    data class Door(val open: Boolean) : LockAction
+    data class Volume(val volume: LockVolume) : LockAction
+}
+
+/**
+ * Comando físico em andamento ou concluído. Vive no ViewModel: rotação ou saída da tela no meio do envio não
+ * cancela um pedido que talvez já tenha chegado à fechadura, e a tela recriada ainda recebe o resultado.
+ */
+sealed interface LockCommand {
+    val lockNs: String
+    val action: LockAction
+    data class Sending(override val lockNs: String, override val action: LockAction) : LockCommand
+    /** [error] = texto amigável da falha; [appliedVolume] = volume a exibir depois de mudar o volume. */
+    data class Done(
+        override val lockNs: String,
+        override val action: LockAction,
+        val error: String?,
+        val appliedVolume: LockVolume? = null,
+    ) : LockCommand
+}
+
 /**
  * Único ViewModel do app: uma fonte de verdade para todas as telas. Só conhece o domain (interfaces de
  * repositório, casos de uso, ErrorMapper), injetado pelo Koin; nunca uma classe de data.
@@ -101,9 +124,33 @@ class HomeViewModel(
     fun stopLive(session: StreamSession) { viewModelScope.launch { repository.stopLive(session) } }
 
     suspend fun lockDetails(lock: Device): Result<LockDetails> = resultOf { repository.lockDetails(lock) }
+
+    private val mutableLockCommand = MutableStateFlow<LockCommand?>(null)
+    val lockCommand: StateFlow<LockCommand?> = mutableLockCommand.asStateFlow()
+
     /** Comando real na fechadura; a UI só chama depois de confirmação do usuário. */
-    suspend fun setLock(lock: Device, open: Boolean): Result<Unit> = resultOf { repository.setLock(lock, open) }
-    suspend fun setLockVolume(lock: Device, volume: LockVolume): Result<LockVolume> = resultOf { changeLockVolumeUseCase(lock, volume) }
+    fun sendDoorCommand(lock: Device, open: Boolean) = runLockCommand(lock, LockAction.Door(open)) {
+        repository.setLock(lock, open)
+        null // a porta não devolve estado: a tela relê o estado real ao receber o Done
+    }
+
+    /** Também só depois de confirmação. O caso de uso grava, relê e, se a releitura falhar, assume o pedido. */
+    fun changeLockVolume(lock: Device, volume: LockVolume) =
+        runLockCommand(lock, LockAction.Volume(volume)) { changeLockVolumeUseCase(lock, volume) }
+
+    /** A tela consumiu o Done: sem isso, ele seria reaplicado na próxima visita à fechadura. */
+    fun lockCommandHandled() { mutableLockCommand.value = null }
+
+    private fun runLockCommand(lock: Device, action: LockAction, command: suspend () -> LockVolume?) {
+        if (mutableLockCommand.value is LockCommand.Sending) return // um comando físico por vez
+        mutableLockCommand.value = LockCommand.Sending(lock.ns, action)
+        viewModelScope.launch {
+            val result = resultOf { command() }
+            val error = result.exceptionOrNull()?.let { messageOf(it) }
+            mutableLockCommand.value = LockCommand.Done(lock.ns, action, error, appliedVolume = result.getOrNull())
+        }
+    }
+
     suspend fun lockVolume(lock: Device): Result<LockVolume?> = resultOf { repository.lockVolume(lock) }
     suspend fun lockHistory(lock: Device, more: Boolean): Result<List<LockEvent>> =
         resultOf { repository.lockHistory(lock, if (more) HISTORY_MORE else HISTORY_FIRST) }

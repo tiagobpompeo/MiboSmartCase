@@ -77,15 +77,25 @@ class FakeProvider(
     override suspend fun isOnline(device: Device): Boolean? = device.online
 }
 
-/** Fechadura falsa: volume em memória; readError/writeError simulam o HTTP 500 real da leitura. */
+/**
+ * Fechadura falsa: volume em memória; readError/writeError simulam o HTTP 500 real da leitura. [doorCommands]
+ * registra os pedidos de porta; [commandDelayMs] (tempo VIRTUAL) deixa o comando em andamento; [commandError] o faz falhar.
+ */
 class FakeLockController : LockController {
     var volume: LockVolume? = LockVolume.MEDIUM
     var readError: Throwable? = null
     var writeError: Throwable? = null
+    var commandError: Throwable? = null
+    var commandDelayMs = 0L
+    val doorCommands = mutableListOf<Boolean>()
     val historyRequests = mutableListOf<Int>()
     override suspend fun details(lock: Device): LockDetails =
         LockDetails(open = false, remoteEnabled = true, battery = 50, volume = volume, volumeError = null, history = emptyList())
-    override suspend fun setOpen(lock: Device, open: Boolean) = Unit
+    override suspend fun setOpen(lock: Device, open: Boolean) {
+        doorCommands += open
+        delay(commandDelayMs)
+        commandError?.let { throw it }
+    }
     override suspend fun volume(lock: Device): LockVolume? { readError?.let { throw it }; return volume }
     override suspend fun setVolume(lock: Device, volume: LockVolume) { writeError?.let { throw it }; this.volume = volume }
     override suspend fun history(lock: Device, count: Int): List<LockEvent> {

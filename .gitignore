@@ -1,0 +1,15 @@
+*.iml
+.gradle/
+.idea/
+local.properties
+**/build/
+.DS_Store
+**/.kotlin/
+xcuserdata/
+*.xcuserstate
+DerivedData/
+*.local.md
+design/
+captures
+.externalNativeBuild
+.cxx

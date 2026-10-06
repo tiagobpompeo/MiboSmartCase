@@ -82,11 +82,13 @@ gdi.token = <token temporário gerado no portal>
 
 ### Binário sem token
 
+O token de `local.properties` só entra em builds de debug. Um build de release (`assembleRelease`, `bundleRelease`, framework iOS em `Release`) gera `GdiBuildConfig.TOKEN = ""` sem nenhum parâmetro:
+
 ```sh
-./gradlew :androidApp:assembleRelease -PgdiDevToken=false
+./gradlew :androidApp:assembleRelease
 ```
 
-Com `-PgdiDevToken=false` o `GdiBuildConfig.TOKEN` gerado é `""` mesmo que `local.properties` tenha `gdi.token` (confira em `shared/build/generated/gdi/commonMain/kotlin/br/com/pompeo/casa/GdiBuildConfig.kt`).
+Para forçar um ou outro comportamento: `-PgdiDevToken=false` (nunca embute) ou `-PgdiDevToken=true` (sempre embute). Confira em `shared/build/generated/gdi/commonMain/kotlin/br/com/pompeo/casa/GdiBuildConfig.kt`.
 
 ---
 
@@ -118,15 +120,16 @@ Fora de propósito: **sem Media3** (o RTSP da nuvem não é aceito por ele; ver 
 
 ## Testes
 
-**86 testes** unitários em 14 classes (meta do projeto: ≥ 70; os 85 da lista da especificação e mais um de regressão, `onlineUsesCompositeNsOnlyForSubdevices`, para um fato da API medido no aparelho), todos em `shared/src/commonTest/kotlin/br/com/pompeo/casa/`. Usam `kotlin.test`, `kotlinx-coroutines-test` e `ktor-client-mock`, sem JUnit nem MockK: os dublês são fakes das interfaces do domínio (`TestSupport.kt`) e todo token é obviamente falso.
+**91 testes** Kotlin em 14 classes de `shared/src/commonTest/kotlin/br/com/pompeo/casa/` (meta do projeto: ≥ 70), rodando na JVM e no simulador iOS: os 85 da lista da [especificação](docs/sdd/PROMPT-CASE-KMP.md), um de regressão para um fato da API medido no aparelho (`onlineUsesCompositeNsOnlyForSubdevices`) e cinco dos comandos da fechadura no `viewModelScope`. Usam `kotlin.test`, `kotlinx-coroutines-test` e `ktor-client-mock`, sem MockK: os dublês são fakes das interfaces do domínio (`TestSupport.kt`) e todo token é obviamente falso. Mais **4 testes em Java** (JUnit 4) no `androidApp`, que chamam a regra Kotlin `TokenFormat` como método estático (`@JvmStatic`).
 
 ```sh
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 ./gradlew :shared:testAndroidHostTest      # JVM do host, sem emulador
 ./gradlew :shared:iosSimulatorArm64Test    # binário de teste no simulador iOS
+./gradlew :androidApp:testDebugUnitTest    # testes em Java (JUnit 4)
 ```
 
-Relatório do Android: `shared/build/reports/tests/testAndroidHostTest/index.html`. O CI roda as duas suítes a cada push.
+Relatório do Android: `shared/build/reports/tests/testAndroidHostTest/index.html`. O workflow de CI roda as duas suítes a cada push; hoje o job iOS passa e o job Android falha na preparação do SDK (ver "Limitações conhecidas").
 
 | Classe | Testes | O que cobre |
 |---|---:|---|
@@ -141,16 +144,17 @@ Relatório do Android: `shared/build/reports/tests/testAndroidHostTest/index.htm
 | `DeviceRepositoryImplTest` | 17 | paginação, filtro com fallback, geração, cancelamento, logout, dois parceiros |
 | `SubmitTokenUseCaseTest` | 8 | validar antes de gravar, renovação durante a validação, cancelamento |
 | `ChangeLockVolumeUseCaseTest` | 3 | grava, relê e assume o pedido se a releitura falhar |
-| `HomeViewModelTest` | 5 | validação em `viewModelScope`, aviso de armazenamento, cancelamento |
+| `HomeViewModelTest` | 10 | validação em `viewModelScope`, aviso de armazenamento, cancelamento, comandos da fechadura e do volume no `viewModelScope` (um por vez, erro e volume aplicado) |
 | `MiboLogicTest` | 5 | lentes, faixa da semana, rótulos |
 | `CameraFormatTest` | 1 | "1º quadro em X s" |
+| `TokenFormatJavaTest` (Java, `androidApp`) | 4 | a mesma regra do token chamada de Java: máscara, plausibilidade, normalização |
 
 ---
 
 ## Arquitetura
 
 - **KMP + Compose Multiplatform:** um módulo `shared` com dados, domínio e UI em `commonMain`; `androidMain`, `iosMain` e Swift só com o que é nativo (armazenamento seguro, player de vídeo, calendário, debug/release). A mesma UI em Compose roda no Android (`MainActivity`) e no iOS (`MainViewController`).
-- **MVVM:** cada tela é um `@Composable` que desenha estado imutável coletado com `collectAsStateWithLifecycle` e chama funções do `HomeViewModel` (`StateFlow`, `viewModelScope`). A navegação usa rotas tipadas e callbacks; o ViewModel não conhece o `NavController`.
+- **MVVM:** cada tela é um `@Composable` que desenha estado imutável coletado com `collectAsStateWithLifecycle` e chama funções do `HomeViewModel` (`StateFlow`, `viewModelScope`). Comandos físicos (abrir/fechar a fechadura, mudar o volume) também rodam no `viewModelScope` e a tela só observa `lockCommand`: girar o aparelho ou sair da tela no meio do envio não cancela um pedido que talvez já tenha chegado à fechadura. A navegação usa rotas tipadas e callbacks; o ViewModel não conhece o `NavController`.
 - **Clean Architecture:** `ui` → `domain` ← `data`. O `domain` é Kotlin puro (só coroutines): modelos, `DevicesState`, `AppError` selado, portas (`TokenRepository`, `DeviceRepository`, `DeviceProvider`, `LockController`, `TokenStorage`, `ErrorMapper`) e casos de uso. `di/Koin.kt` é a raiz de composição e registra cada `*Impl` pela interface.
 - **Só dois casos de uso**, onde há regra de negócio: `SubmitTokenUseCase` (validar o formato, testar o token carregando a 1.ª página, gravar só em sucesso, sair em erro ou cancelamento) e `ChangeLockVolumeUseCase` (gravar, reler e assumir o valor pedido se a releitura falhar). Listar, filtrar, paginar, vídeo e leituras da fechadura seriam casos de uso de uma linha, sem regra; o ViewModel chama a interface do repositório diretamente.
 - **Regra de dependência conferida** (os três comandos têm de vir vazios):
@@ -167,15 +171,15 @@ grep -n "^import br\.com\.pompeo\.casa\." "$SRC/ui/HomeViewModel.kt" | grep -v "
 ## Decisões
 
 - **Ktor com parse manual.** A GDI serve JSON com `content-type: text/plain`, que o `ContentNegotiation` não converte. A resposta é lida com `bodyAsText()` e `Json.parseToJsonElement`; o parser tolera corpo de erro que é uma string JSON, envelope `"status":"erro"` dentro de HTTP 200 e nomes de campo alternativos. O corpo do pedido é montado com `buildJsonObject`, porque os três campos da listagem são obrigatórios (sem `origem` a API responde 500).
-- **libVLC (Android) e VLCKit (iOS), não Media3 nem AVPlayer.** A API devolve um RTSP de um proxy da nuvem cujo SDP anuncia H.265 e AAC **sem nenhuma linha `a=fmtp`** (os parâmetros do H.265 vêm dentro do fluxo). O RTSP do Media3 recusa esse SDP ("missing attribute fmtp") e o AVPlayer não toca RTSP. O VLC aceita. Ajustes medidos: decodificação por software desde o 1.º pacote (o decoder de hardware precisaria da resolução que viria do `fmtp`), áudio desligado, buffer de 800 ms no Android (`LIVE_NETWORK_CACHING_MS`) e liberação do player fora da main thread (evita ANR ao sair da tela). No iOS o VLCKit fica em Swift, implementando uma interface Kotlin (`NativeVideoPlayer`): inversão de dependência, sem cinterop com o VLCKit.
+- **libVLC (Android) e VLCKit (iOS), não Media3 nem AVPlayer.** A API devolve um RTSP de um proxy da nuvem cujo SDP anuncia H.265 e AAC **sem nenhuma linha `a=fmtp`** (os parâmetros do H.265 vêm dentro do fluxo). O RTSP do Media3 recusa esse SDP ("missing attribute fmtp") e o AVPlayer não toca RTSP. O VLC aceita. Ajustes medidos: decodificação por software desde o 1.º pacote (o decoder de hardware precisaria da resolução que viria do `fmtp`), áudio desligado, buffer de 800 ms no Android (`LIVE_NETWORK_CACHING_MS`) e todas as chamadas bloqueantes do libVLC (`stop`, `play`, `release`) numa única thread de controle (`vlc-control`), na ordem em que foram pedidas: nem sair da tela nem ir para background trava a main thread (evita ANR). No iOS o VLCKit fica em Swift, implementando uma interface Kotlin (`NativeVideoPlayer`): inversão de dependência, sem cinterop com o VLCKit.
 - **Android Keystore com AES-GCM, direto.** Chave AES-256 que nunca sai do Keystore; `iv:ciphertext` em SharedPreferences privadas. A `security-crypto` (EncryptedSharedPreferences) foi descontinuada pela Google; o Keystore direto não traz dependência extra. Sem `setUserAuthenticationRequired` (invalidaria a chave ao trocar o bloqueio de tela) e com `allowBackup="false"`.
-- **Keychain via `platform.Security`.** Acesso pelo cinterop que o Kotlin/Native já traz, com `kSecAttrAccessibleAfterFirstUnlock`. Os testes iOS usam armazenamento em memória, porque o executável de teste não tem o entitlement do Keychain.
+- **Keychain via `platform.Security`.** Acesso pelo cinterop que o Kotlin/Native já traz, com `kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`: o token não migra para outro aparelho por backup, como o `allowBackup="false"` no Android. Os testes iOS usam armazenamento em memória, porque o executável de teste não tem o entitlement do Keychain.
 - **Koin, não Hilt.** O Hilt só existe no Android; o Koin roda em `commonMain` e entrega o ViewModel com `koinViewModel`.
 - **Lista de `DeviceProvider`.** Cada parceiro implementa `DeviceProvider` (e `LockController`, se tiver fechaduras); o repositório recebe **todos** pelo Koin (`getAll()`), junta as páginas e delega cada operação ao parceiro dono do dispositivo (`Device.providerId`).
 - **Renovação do token serializada com `Mutex`.** Em 401/403 o app renova uma única vez e repete a chamada. Chamadas paralelas fazem uma só renovação ("o token já mudou? então só repete"), porque o token antigo deixa de valer e uma segunda renovação seria recusada. Se a renovação falhar, vale o status original (403 → expirado) e o app pede um token novo.
 - **Concorrência na listagem.** `Mutex` para escritas, contador de geração para que a resposta de um filtro antigo nunca apareça, e `Job`s separados para que trocar o filtro cancele em vez de esperar. `CancellationException` é sempre relançada (`resultOf` no lugar de `runCatching`).
 - **Nativo por `expect`/`actual` de funções e vals de topo**, sem `expect class`, que exigiria flag de compilador.
-- **Sem arquivos `.java`** (ver "Interoperabilidade com Java").
+- **Java na borda Android** (ver "Interoperabilidade com Java"): a regra de negócio fica em Kotlin, no `commonMain`, e o `androidApp` tem código e teste em Java chamando essa regra.
 
 ---
 
@@ -186,11 +190,12 @@ grep -n "^import br\.com\.pompeo\.casa\." "$SRC/ui/HomeViewModel.kt" | grep -v "
 - **Mesma imagem nas duas lentes** da câmera Dual: a GDI devolve o mesmo RTSP para `canalVideo` 0 e 1. O app envia o canal certo e avisa na tela.
 - **Partida a frio do proxy RTSP da nuvem:** cerca de 21 s até o 1.º quadro no Android (igual em qualquer cliente; a quente, cerca de 3 s). No iOS houve uma única medição a frio de 37,8 s. O iOS mantém buffer de 300 ms + `clock-jitter 0`; alinhar com os 800 ms do Android é **hipótese não testada**.
 - **Sem eventos em tempo real.** Movimento, campainha e aberturas chegam só por webhook, que exige backend; as abas de mensagens dizem isso.
-- **Token em `const val` é extraível.** Um valor de `local.properties` compilado num APK ou binário pode ser lido por quem tiver o arquivo. Aceitável só em demo; o release usa `-PgdiDevToken=false`. Em produção, o token fica num backend e o app recebe só URLs de vídeo de curta duração.
+- **Token em `const val` é extraível.** Um valor de `local.properties` compilado num APK ou binário pode ser lido por quem tiver o arquivo. Aceitável só em demo; por isso só os builds de debug embutem o valor, e o release sai sem ele. Em produção, o token fica num backend e o app recebe só URLs de vídeo de curta duração.
 - **Áudio desativado:** o AAC vem sem `config` no SDP e vira ruído. O botão de mudo alterna, mas não tem efeito audível.
 - **URL RTSP expira** (`expire`): depois de muito tempo em background a reconexão pode falhar; aparece o erro com "Tentar novamente", que pede uma sessão nova.
 - **iOS só para o player no dispose da tela.** O Android para em `ON_STOP` e reconecta em `ON_START`. No iOS o `stop()` do VLCKit roda na main thread (risco de travar ao sair, não observado).
 - **APK de cerca de 165 MB** em debug com 3 ABIs, porque o libVLC traz um `.so` grande por ABI.
+- **CI:** o workflow roda a cada push; o job iOS passa, e o job Android falha hoje na preparação do SDK no runner (as suítes rodam verdes localmente e nos aparelhos).
 - **Licença LGPL 2.1+** do libVLC e do VLCKit: falta tela de licenças, e a distribuição pede revisão jurídica, sobretudo no iOS (linkagem com o app).
 - **Tipo de dispositivo inferido** pelo prefixo de modelo/nome (a API não informa categoria). Medido para câmera (`iM`), fechadura (`MFR`) e hub (`MCA`/`IOT-ZG`); os demais prefixos e parte dos tipos de evento do histórico são hipótese.
 - **`criar-fluxo-video` pode responder HTTP 500 transitório:** em 05/10/2026 a primeira chamada a frio voltou 500; a tela mostrou o erro amigável e "Tentar novamente" (que pede uma sessão nova) abriu o vídeo.
@@ -200,14 +205,14 @@ grep -n "^import br\.com\.pompeo\.casa\." "$SRC/ui/HomeViewModel.kt" | grep -v "
 
 ## Verificação em aparelho
 
-**Estado: executado em 05/10/2026 no Moto G9 Play (Android 11) com a API real e a conta de teste; no iOS, parcialmente** (iPhone 13 Pro físico: build assinado instalado e aberto com o token pré-preenchido; os fluxos 4, 9 e 17 foram conferidos no simulador iPhone 17 com a API real). Linhas 2 e 8 ainda dependem de um token vencido real e do modo avião; foram conferidas só no simulador, contra um servidor local que imita o contrato da seção "Contrato real × Swagger". Nenhum comando de fechadura ou de volume foi confirmado.
+**Estado: executado em 05/10/2026 no Moto G9 Play (Android 11) com a API real e a conta de teste; no iOS, parcialmente** (iPhone 13 Pro físico: build assinado instalado e aberto com o token pré-preenchido; os fluxos 4, 9 e 17 foram conferidos no simulador iPhone 17 com a API real). O token vencido real (linha 2) foi conferido no iPhone físico em 06/10/2026. A linha 8 ainda depende do modo avião no aparelho; foi conferida só no simulador, contra um servidor local que imita o contrato da seção "Contrato real × Swagger". Nenhum comando de fechadura ou de volume foi confirmado.
 
 Preparação: apagar os dados do app (`adb shell pm clear br.com.pompeo.casa`; no iPhone, apagar e reinstalar), gerar um token novo no portal e colocá-lo em `local.properties` ou colá-lo na tela. Comandos de fechadura e de volume só são confirmados com autorização explícita do dono da conta.
 
 | # | RF | Passos | Deve aparecer | Data/hora | Aparelho | Resultado |
 |---|---|---|---|---|---|---|
 | 1 | RF01 | Abrir o app sem dados | "Conectar à conta Intelbras", escudo verde, campo "Token de acesso" mascarado; com `local.properties`, "Pré-preenchido pelo local.properties (desenvolvimento)" | 05/10 23:27 | Moto G9 Play | OK: igual a `app-01`; sem `gdi.token`, "Entrar" desabilitado; com ele, o aviso de pré-preenchimento |
-| 2 | RF04 | "Entrar" com um token expirado | "Seu token expirou (ele vale cerca de 2 horas)…", sem sair da tela | — | Simulador (mock) | OK só contra o mock (403 "Token expirado"); pendente com token vencido real |
+| 2 | RF04 | "Entrar" com um token expirado | "Seu token expirou (ele vale cerca de 2 horas)…", sem sair da tela | 06/10 11:27 | iPhone 13 Pro | OK com a API real: o token salvo venceu e a Home mostrou "Seu token expirou (ele vale cerca de 2 horas)…" (403; a renovação respondeu 400). Na tela de token, conferido só contra o mock |
 | 3 | RF04 | "Entrar" com um texto qualquer de 8 ou mais caracteres | "Token inválido ou expirado. Gere um novo token…" | 05/10 23:27 | Moto G9 Play | OK: "Token inválido ou expirado…" (a API real respondeu 401 "Não autorizado, verifique os seus limites disponíveis") |
 | 4 | RF01/RF02 | "Entrar" com o token válido | "Validando token…" no botão → Home com a câmera iM4 Dual (badge 2), a fechadura MFR 2030 (via hub) e o hub MCA 1002 | 05/10 23:33 | Moto G9 Play; simulador iOS | OK: iM4 Dual (badge 2), MFR 2030 (via hub), MCA 1002, igual a `app-03` |
 | 5 | RF01 | Fechar e reabrir o app | Vai direto para a Home (token do Keystore/Keychain) | 05/10 23:52 | Moto G9 Play | OK: abriu direto na Home |
@@ -250,14 +255,14 @@ Quem tem câmeras, fechadura e hub Intelbras quer, num só app, ver a câmera ao
 | RF08 | Itens por página 2/5/10/50, "Carregar mais", "Sem mais informações", contagem; erro ao carregar mais mantém a lista | Feito |
 | RF09 | Histórico com 10 eventos, "Ver mais" com 30; vazio e erro com textos diferentes | Feito |
 
-O roteiro de 19 passos (RF01–RF09) foi executado no Android físico com a API real em 05/10/2026, com comparação lado a lado com as capturas de referência; no iOS, o build assinado roda no iPhone e os fluxos principais foram conferidos no simulador com a API real. Pendentes: token vencido real, modo avião e a repetição completa no iPhone físico (detalhes na seção "Verificação em aparelho" do README do repositório).
+O roteiro de 19 passos (RF01–RF09) foi executado no Android físico com a API real em 05/10/2026, com comparação lado a lado com as capturas de referência; no iOS, o build assinado roda no iPhone e os fluxos principais foram conferidos no simulador com a API real. Pendentes: modo avião no aparelho e a repetição completa no iPhone físico (detalhes na seção "Verificação em aparelho" do README do repositório).
 
 ### Camadas
 
 ```
    apresentação (pacote ui/ + App.kt + player/)          dados (pacote data/)
    Composables ── eventos ──► HomeViewModel               TokenRepositoryImpl · DeviceRepositoryImpl
-        ▲                        │  StateFlow<UiState>     GdiApi (Ktor) · GdiDeviceProvider · GdiErrorMapper
+        ▲                        │  StateFlow (estado)     GdiApi (Ktor) · GdiDeviceProvider · GdiErrorMapper
         └──── estado imutável ───┘                         KeystoreTokenStorage / KeychainTokenStorage
                                  │ depende de                      │ implementa
                                  ▼                                 ▼
@@ -293,15 +298,20 @@ Hoje: um módulo Gradle `shared` (mais `androidApp` e `iosApp`), com fronteiras 
 
 ### Interoperabilidade com Java
 
-`commonMain` não compila Java, então as regras de negócio são Kotlin (por exemplo, `TokenFormat` é um `object`). A interop com Java está na borda Android, em `androidMain`: `java.security.KeyStore` e `javax.crypto` (armazenamento do token), `java.time` (faixa da semana), `java.lang.Thread` (liberar o libVLC fora da main), a API Java do libVLC (`org.videolan.libvlc`, JNI por baixo) e `android.util.Base64`. Em `commonMain`, `kotlinx.io.IOException` é `typealias` de `java.io.IOException` na JVM, o que define a ordem dos ramos no mapeador de erro. **Não há arquivos `.java`**: o plugin de biblioteca KMP do AGP é orientado a Kotlin e uma regra em Java teria de ser duplicada para o iOS. Num app Android puro um utilitário Java legado seria mantido e chamado do Kotlin; no KMP a regra precisa estar em `commonMain`. Do lado iOS, a interop é Kotlin/Native ↔ Swift (interface Kotlin implementada em Swift) e cinterop com `platform.Security`.
+`commonMain` não compila Java, e uma regra escrita em Java teria de ser duplicada para o iOS; por isso as regras de negócio são Kotlin. A interop com Java acontece na borda Android, nos dois sentidos:
+
+- **Java chamando Kotlin** (`androidApp`): `CasaApplication.java` inicia o Koin chamando a função de topo `initKoin` (no bytecode, o estático `KoinKt.initKoin`), passa o tipo-função `KoinApplication.() -> Unit` como `Function1` que devolve `Unit.INSTANCE` e chama a extensão `androidContext` como estático que recebe o receptor no primeiro argumento. `TokenFormatJavaTest.java` (JUnit 4) chama a regra do token como `TokenFormat.mask(...)`, graças ao `@JvmStatic` no `object` Kotlin.
+- **Kotlin chamando Java** (`androidMain`): `java.security.KeyStore` e `javax.crypto` (armazenamento do token), `java.time` (faixa da semana), `java.util.concurrent` (thread de controle do libVLC), a API Java do libVLC (`org.videolan.libvlc`, JNI por baixo) e `android.util.Base64`. Em `commonMain`, `kotlinx.io.IOException` é `typealias` de `java.io.IOException` na JVM, o que define a ordem dos ramos no mapeador de erro.
+
+Do lado iOS, a interop é Kotlin/Native ↔ Swift (interface Kotlin implementada em Swift) e cinterop com `platform.Security`.
 
 ### Segurança do token
 
 - Nunca em arquivo versionado; `local.properties` é ignorado pelo Git e só pré-preenche a tela, sem login automático. `git grep -n "Ot_"` mostra só tokens falsos de teste.
 - Gravado só depois de validado pela 1.ª página; erro ou cancelamento na validação apaga o token da sessão.
-- Persistência cifrada: Keystore (AES-GCM) no Android, Keychain no iOS; `allowBackup="false"` para o dado cifrado não ir para backup nem para outro aparelho.
+- Persistência cifrada: Keystore (AES-GCM) no Android, com `allowBackup="false"`; Keychain no iOS, com acesso `ThisDeviceOnly`. Nos dois casos o token não vai para outro aparelho por backup.
 - Fora de logs: nenhum `println`/`Log`/`NSLog`, nenhum plugin `Logging` do Ktor, token fora de mensagens de exceção. Na tela, só mascarado (`Ot_ab…wxyz`).
-- Binário de distribuição com `-PgdiDevToken=false`. Em produção o token ficaria num backend, e o app receberia só URLs de vídeo de curta duração.
+- Só builds de debug embutem o token de desenvolvimento; o release sai com `GdiBuildConfig.TOKEN = ""` sem parâmetro. Em produção o token ficaria num backend, e o app receberia só URLs de vídeo de curta duração.
 
 ### Contrato real × Swagger
 
@@ -350,3 +360,5 @@ O app foi construído com um agente de IA de código (Claude Code), em **desenvo
 - a lista dos testes esperados e as capturas de referência do app Mibo Smart para cada tela.
 
 A implementação foi dividida entre agentes por área (domínio e dados, telas, vídeo, testes, documentação), presos a um contrato de nomes e assinaturas, com um agente de build compilando e corrigindo no fim. A verificação não depende da palavra do agente: testes unitários em `commonTest` (JVM e simulador iOS), builds Android e iOS, os `grep` da regra de dependência, o CI no GitHub Actions (a cada push), o roteiro em aparelho real com a API real (no Android físico e parcialmente no iOS) e a comparação lado a lado com as capturas de referência. Comandos físicos na fechadura não são disparados pelo agente: exigem autorização explícita do dono da conta.
+
+A especificação usada está versionada em [`docs/sdd/PROMPT-CASE-KMP.md`](docs/sdd/PROMPT-CASE-KMP.md) (só o ID do certificado Apple foi ocultado; as capturas de referência, de terceiros, não estão no repositório). O registro de como ela foi executada e verificada, etapa por etapa, com o que só o aparelho real revelou, está em [`docs/sdd/LOG.md`](docs/sdd/LOG.md).

@@ -186,7 +186,7 @@ grep -n "^import br\.com\.pompeo\.casa\." "$SRC/ui/HomeViewModel.kt" | grep -v "
 ## Limitações conhecidas
 
 - **Comandos físicos nunca executados no equipamento real.** Abrir/fechar a fechadura e mudar o volume agem num aparelho de terceiros; foram validados com a resposta documentada (`{"status":"sucesso"}` sem `data`) nos testes. No app, todo comando passa por um diálogo de confirmação.
-- **Leitura de volume dá HTTP 500** na fechadura de teste (medido em 03 e 05/10/2026). A tela mostra "Volume indisponível (a API respondeu HTTP 500)" com "Tentar de novo" e mantém a escrita habilitada; depois de gravar, se a releitura falhar, assume o valor pedido.
+- **Leitura de volume dá HTTP 500** na fechadura de teste (medido em 03, 05 e 06/10/2026). Em 06/10 foram testadas variações do pedido, só de leitura: com o par certo (`ns` composto + `idProduto` da fechadura, o mesmo que funciona para estado, bateria e online) a API reconhece o aparelho e responde 500 "Erro desconhecido" em ~1,4 s, em todas as tentativas; com um par errado (`ns` puro + `idProduto` da fechadura, ou `ns` composto + `idProduto` do hub) responde 404 "Dispositivo não encontrado". O formato do pedido está certo, e a falha é da GDI para esta fechadura. A tela mostra "Volume indisponível (a API respondeu HTTP 500)" com "Tentar de novo" e mantém a escrita habilitada; depois de gravar, se a releitura falhar, assume o valor pedido.
 - **Mesma imagem nas duas lentes** da câmera Dual: a GDI devolve o mesmo RTSP para `canalVideo` 0 e 1. O app envia o canal certo e avisa na tela.
 - **Partida a frio do proxy RTSP da nuvem:** cerca de 21 s até o 1.º quadro no Android (igual em qualquer cliente; a quente, cerca de 3 s). No iOS houve uma única medição a frio de 37,8 s. O iOS mantém buffer de 300 ms + `clock-jitter 0`; alinhar com os 800 ms do Android é **hipótese não testada**.
 - **Sem eventos em tempo real.** Movimento, campainha e aberturas chegam só por webhook, que exige backend; as abas de mensagens dizem isso.
@@ -250,7 +250,7 @@ Quem tem câmeras, fechadura e hub Intelbras quer, num só app, ver a câmera ao
 | RF03 | Vídeo ao vivo com %, etapa, "AO VIVO" e tempo do 1.º quadro; libera player e sessão ao sair; lentes da Dual; Android e iOS | Feito |
 | RF04 | Mensagens distintas para token ausente, inválido (401), expirado (403), sem rede, timeout, erro do servidor e lista vazia por filtro; detalhe técnico só em debug | Feito |
 | RF05 | Fechadura: estado, bateria, online, abertura remota; segurar 600 ms → confirmação → comando → releitura | Feito sem execução física (o comando nunca foi enviado ao equipamento real) |
-| RF06 | Volume Mudo/Baixo/Médio/Alto; erro de leitura honesto com escrita habilitada; grava e relê | Feito sem execução física (a escrita nunca foi enviada ao equipamento real) |
+| RF06 | Volume Mudo/Baixo/Médio/Alto; erro de leitura honesto com escrita habilitada; grava e relê | Feito, com limitação da API: a GDI responde 500 à leitura do volume desta fechadura (pedido conferido, ver "Contrato real × Swagger"); a escrita nunca foi enviada ao equipamento real |
 | RF07 | Filtro Todos/Vinculados/Compartilhados no servidor; recomeça na página 1; resposta de filtro antigo descartada | Feito |
 | RF08 | Itens por página 2/5/10/50, "Carregar mais", "Sem mais informações", contagem; erro ao carregar mais mantém a lista | Feito |
 | RF09 | Histórico com 10 eventos, "Ver mais" com 30; vazio e erro com textos diferentes | Feito |
@@ -323,7 +323,7 @@ Medido na conta de teste entre 02 e 05/10/2026; onde diverge do Swagger, vale o 
 - A API não informa a categoria do dispositivo: é inferida pelo prefixo de modelo/nome.
 - Fechadura e bateria exigem `ns` composto `NsDispositivo_NsHub_IdProdutoHub`, com o `idProduto` da própria fechadura no corpo.
 - Vídeo: o Swagger promete MP4 por HTTPS, `session_id`, `monitor_url` e cota; a resposta real é **só uma URL RTSP** que expira sozinha. `canalVideo` 0 e 1 devolvem o mesmo RTSP; `streamId 0` → 500.
-- Volume da fechadura → 500 na fechadura de teste; rotas de cota e sessões de streaming → 403 sem plano.
+- Volume da fechadura → 500 na fechadura de teste, mesmo com o pedido que a API reconhece (um par `ns`/`idProduto` errado dá 404, o certo dá 500); estado, bateria e online da mesma fechadura respondem normalmente. Rotas de cota e sessões de streaming → 403 sem plano.
 - **Online de subdispositivo** (medido em 05/10/2026 com este app): `/produtos/online/v1` com o `ns` puro da fechadura Zigbee responde `online:false` mesmo com a listagem dizendo `"status":"online"`; com o `ns` composto responde `true`. Câmera e hub respondem certo com o `ns` puro. O app consulta com o `ns` composto só nos subdispositivos.
 - `criar-fluxo-video` pode voltar HTTP 500 transitório (1.ª chamada a frio em 05/10/2026); uma nova chamada funciona.
 

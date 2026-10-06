@@ -27,6 +27,7 @@ Antes do código, a especificação fixou:
 - **Online de subdispositivo:** `/produtos/online/v1` responde `online:false` para a fechadura Zigbee consultada com o `ns` puro (como a especificação mandava) e `true` com o `ns` composto. Corrigido em `GdiDeviceProvider.isOnline`, com teste de regressão, e registrado no README.
 - **Layout no iPhone de 390 pt:** o banner quebrava "Armazenamento" no meio e nomes de aparelhos viravam reticências. Textos passaram a reduzir a fonte até caber (`FitText`), e o aviso de erro da câmera passou a respeitar o selo e os botões do vídeo.
 - **API real:** a primeira chamada a `criar-fluxo-video` pode voltar HTTP 500 transitório ("Tentar novamente" resolve); o 401 real hoje traz "Não autorizado, verifique os seus limites disponíveis".
+- **Volume da fechadura:** a leitura (`/fechaduras/volume/v1`) foi investigada só com pedidos de leitura. O par `ns` composto + `idProduto` da fechadura — o mesmo que funciona para estado, bateria e online — é reconhecido pela API e responde 500 em todas as tentativas (~1,4 s); pares errados respondem 404 "Dispositivo não encontrado". Conclusão: o pedido está certo e a falha é da GDI para esta fechadura; o app mantém o aviso honesto e a escrita habilitada.
 - **Android Studio:** o modelo do Gradle da IDE ainda tinha o pacote do assistente e tentava abrir `org.example.project/…MainActivity`; um Sync resolveu, sem mudança de código.
 
 ## 4. Auditoria final contra o enunciado

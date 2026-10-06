@@ -118,7 +118,7 @@ Fora de propósito: **sem Media3** (o RTSP da nuvem não é aceito por ele; ver 
 
 ## Testes
 
-**85 testes** unitários em 14 classes (meta do projeto: ≥ 70), todos em `shared/src/commonTest/kotlin/br/com/pompeo/casa/`. Usam `kotlin.test`, `kotlinx-coroutines-test` e `ktor-client-mock`, sem JUnit nem MockK: os dublês são fakes das interfaces do domínio (`TestSupport.kt`) e todo token é obviamente falso.
+**86 testes** unitários em 14 classes (meta do projeto: ≥ 70; os 85 da lista da especificação e mais um de regressão, `onlineUsesCompositeNsOnlyForSubdevices`, para um fato da API medido no aparelho), todos em `shared/src/commonTest/kotlin/br/com/pompeo/casa/`. Usam `kotlin.test`, `kotlinx-coroutines-test` e `ktor-client-mock`, sem JUnit nem MockK: os dublês são fakes das interfaces do domínio (`TestSupport.kt`) e todo token é obviamente falso.
 
 ```sh
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
@@ -133,7 +133,7 @@ Relatório do Android: `shared/build/reports/tests/testAndroidHostTest/index.htm
 | `TokenFormatTest` | 3 | normalização, plausibilidade e máscara do token |
 | `DomainModelTest` | 4 | origem, filtro, `hasMore`, escala de volume |
 | `TokenRepositoryImplTest` | 7 | sessão em memória × persistido, falha do armazenamento seguro |
-| `GdiApiTest` | 18 | Bearer, corpo, `text/plain`, renovação única (inclusive em paralelo), fechadura, vídeo, erros reais |
+| `GdiApiTest` | 19 | Bearer, corpo, `text/plain`, renovação única (inclusive em paralelo), fechadura, vídeo, online de subdispositivo, erros reais |
 | `GdiDeviceParserTest` | 5 | envelopes e nomes de campo alternativos, dedup, tipos |
 | `GdiRealResponseTest` | 2 | resposta real anonimizada, `ns` composto, data formatada |
 | `GdiErrorMapperTest` | 5 | token ausente/inválido/expirado, rede, timeout, servidor |
@@ -193,37 +193,38 @@ grep -n "^import br\.com\.pompeo\.casa\." "$SRC/ui/HomeViewModel.kt" | grep -v "
 - **APK de cerca de 165 MB** em debug com 3 ABIs, porque o libVLC traz um `.so` grande por ABI.
 - **Licença LGPL 2.1+** do libVLC e do VLCKit: falta tela de licenças, e a distribuição pede revisão jurídica, sobretudo no iOS (linkagem com o app).
 - **Tipo de dispositivo inferido** pelo prefixo de modelo/nome (a API não informa categoria). Medido para câmera (`iM`), fechadura (`MFR`) e hub (`MCA`/`IOT-ZG`); os demais prefixos e parte dos tipos de evento do histórico são hipótese.
+- **`criar-fluxo-video` pode responder HTTP 500 transitório:** em 05/10/2026 a primeira chamada a frio voltou 500; a tela mostrou o erro amigável e "Tentar novamente" (que pede uma sessão nova) abriu o vídeo.
 - Rotas de cota e sessões de streaming respondem 403 na conta de teste (sem plano) e não são usadas; sem `session_id` na resposta, não há sessão a encerrar (a URL expira sozinha).
 
 ---
 
 ## Verificação em aparelho
 
-**Estado: pendente. O roteiro abaixo ainda NÃO foi executado** no Android físico nem no iPhone; as colunas Data/hora, Aparelho e Resultado serão preenchidas na execução.
+**Estado: executado em 05/10/2026 no Moto G9 Play (Android 11) com a API real e a conta de teste; no iOS, parcialmente** (iPhone 13 Pro físico: build assinado instalado e aberto com o token pré-preenchido; os fluxos 4, 9 e 17 foram conferidos no simulador iPhone 17 com a API real). Linhas 2 e 8 ainda dependem de um token vencido real e do modo avião; foram conferidas só no simulador, contra um servidor local que imita o contrato da seção "Contrato real × Swagger". Nenhum comando de fechadura ou de volume foi confirmado.
 
 Preparação: apagar os dados do app (`adb shell pm clear br.com.pompeo.casa`; no iPhone, apagar e reinstalar), gerar um token novo no portal e colocá-lo em `local.properties` ou colá-lo na tela. Comandos de fechadura e de volume só são confirmados com autorização explícita do dono da conta.
 
 | # | RF | Passos | Deve aparecer | Data/hora | Aparelho | Resultado |
 |---|---|---|---|---|---|---|
-| 1 | RF01 | Abrir o app sem dados | "Conectar à conta Intelbras", escudo verde, campo "Token de acesso" mascarado; com `local.properties`, "Pré-preenchido pelo local.properties (desenvolvimento)" | | | |
-| 2 | RF04 | "Entrar" com um token expirado | "Seu token expirou (ele vale cerca de 2 horas)…", sem sair da tela | | | |
-| 3 | RF04 | "Entrar" com um texto qualquer de 8 ou mais caracteres | "Token inválido ou expirado. Gere um novo token…" | | | |
-| 4 | RF01/RF02 | "Entrar" com o token válido | "Validando token…" no botão → Home com a câmera iM4 Dual (badge 2), a fechadura MFR 2030 (via hub) e o hub MCA 1002 | | | |
-| 5 | RF01 | Fechar e reabrir o app | Vai direto para a Home (token do Keystore/Keychain) | | | |
-| 6 | RF07 | Chips Compartilhados → Vinculados → Todos | Compartilhados: "Nenhum dispositivo encontrado" + "Nenhum dispositivo compartilhado com esta conta."; os outros: 3 dispositivos | | | |
-| 7 | RF08 | Definições → Itens por página 2 → Início → "Carregar mais" | "1 página(s) · 2 dispositivo(s) · 2 por página" + "Carregar mais" → "2 página(s) · 3 dispositivo(s) · 2 por página" + "Sem mais informações" | | | |
-| 8 | RF04/RF08 | (a) Modo avião → Definições → Atualizar → Início. (b) Sem modo avião, 2 por página e só a 1.ª página → ligar o modo avião → "Carregar mais" | (a) Cartão "Sem conexão com a internet…" com "Tentar novamente"; a lista anterior não some das telas de detalhe. (b) Os 2 itens continuam; abaixo, "Sem conexão…" + "Tentar novamente" (que, sem modo avião, carrega a página 2) | | | |
-| 9 | RF03 | Abrir a iM4 Dual (a frio) | % e etapa sobem; depois "AO VIVO" e "1º quadro em ~21 s" | | | |
-| 10 | RF03 | Voltar e abrir de novo | "1º quadro em ~3 s" | | | |
-| 11 | RF03 | "Lente fixa" | Reinicia (~3 s) e mostra "A API GDI devolve o mesmo vídeo para as duas lentes desta câmera." | | | |
-| 12 | RF03 | Tela cheia, mudo, PTZ, gravar, microfone, foto | Tela cheia não reinicia o vídeo; mudo alterna (sem efeito audível: áudio desativado); os demais mostram o Snackbar "Indisponível na API GDI"/"PTZ não disponível na API GDI" | | | |
-| 13 | RF05 | Abrir a MFR 2030 | "Porta fechada", bateria %, Online, "Pressione e segure para abrir a porta." | | | |
-| 14 | RF05 | Segurar o círculo 600 ms | Diálogo "Destrancar a fechadura?" → **Cancelar** | | | |
-| 15 | RF06 | Cartão Volume | "Volume indisponível (a API respondeu HTTP 500)" + "Tentar de novo"; Mudo/Baixo/Médio/Alto habilitados (não tocar sem autorização) | | | |
-| 16 | RF09 | Histórico | Eventos "Remoto (APP)"/"Por dentro (manual)" com data e hora; "Ver mais" se houver 10 | | | |
-| 17 | — | Hub MCA 1002 | Online, faixa da semana com hoje em verde, 1 subdispositivo, "Firmware 2.4.628243" com "Atualizado" | | | |
-| 18 | — | Definições → Sair | Volta à tela de token; o "voltar" do sistema não retorna à Home | | | |
-| 19 | — | Repetir 4, 9, 13 e 17 no iPhone | Mesmo comportamento; vídeo via VLCKit (1.º quadro a frio pode passar de 30 s) | | | |
+| 1 | RF01 | Abrir o app sem dados | "Conectar à conta Intelbras", escudo verde, campo "Token de acesso" mascarado; com `local.properties`, "Pré-preenchido pelo local.properties (desenvolvimento)" | 05/10 23:27 | Moto G9 Play | OK: igual a `app-01`; sem `gdi.token`, "Entrar" desabilitado; com ele, o aviso de pré-preenchimento |
+| 2 | RF04 | "Entrar" com um token expirado | "Seu token expirou (ele vale cerca de 2 horas)…", sem sair da tela | — | Simulador (mock) | OK só contra o mock (403 "Token expirado"); pendente com token vencido real |
+| 3 | RF04 | "Entrar" com um texto qualquer de 8 ou mais caracteres | "Token inválido ou expirado. Gere um novo token…" | 05/10 23:27 | Moto G9 Play | OK: "Token inválido ou expirado…" (a API real respondeu 401 "Não autorizado, verifique os seus limites disponíveis") |
+| 4 | RF01/RF02 | "Entrar" com o token válido | "Validando token…" no botão → Home com a câmera iM4 Dual (badge 2), a fechadura MFR 2030 (via hub) e o hub MCA 1002 | 05/10 23:33 | Moto G9 Play; simulador iOS | OK: iM4 Dual (badge 2), MFR 2030 (via hub), MCA 1002, igual a `app-03` |
+| 5 | RF01 | Fechar e reabrir o app | Vai direto para a Home (token do Keystore/Keychain) | 05/10 23:52 | Moto G9 Play | OK: abriu direto na Home |
+| 6 | RF07 | Chips Compartilhados → Vinculados → Todos | Compartilhados: "Nenhum dispositivo encontrado" + "Nenhum dispositivo compartilhado com esta conta."; os outros: 3 dispositivos | 05/10 23:53 | Moto G9 Play | OK: Compartilhados vazio com o texto do filtro (igual a `app-05`); Vinculados e Todos com 3 |
+| 7 | RF08 | Definições → Itens por página 2 → Início → "Carregar mais" | "1 página(s) · 2 dispositivo(s) · 2 por página" + "Carregar mais" → "2 página(s) · 3 dispositivo(s) · 2 por página" + "Sem mais informações" | 05/10 23:54 | Moto G9 Play | OK: "1 página(s) · 2 dispositivo(s) · 2 por página" → "2 página(s) · 3 dispositivo(s) · 2 por página" + "Sem mais informações" |
+| 8 | RF04/RF08 | (a) Modo avião → Definições → Atualizar → Início. (b) Sem modo avião, 2 por página e só a 1.ª página → ligar o modo avião → "Carregar mais" | (a) Cartão "Sem conexão com a internet…" com "Tentar novamente"; a lista anterior não some das telas de detalhe. (b) Os 2 itens continuam; abaixo, "Sem conexão…" + "Tentar novamente" (que, sem modo avião, carrega a página 2) | — | Simulador (mock) | Parcial: "Sem conexão…" conferido contra o mock fora do ar; modo avião no aparelho pendente |
+| 9 | RF03 | Abrir a iM4 Dual (a frio) | % e etapa sobem; depois "AO VIVO" e "1º quadro em ~21 s" | 05/10 23:34 | Moto G9 Play; simulador iOS | OK: % e etapa, "AO VIVO", "1º quadro em 22,6 s" a frio no Android (a 1.ª sessão voltou HTTP 500 transitório; "Tentar novamente" resolveu); iOS com VLCKit: 2,4 s com o proxy já aquecido |
+| 10 | RF03 | Voltar e abrir de novo | "1º quadro em ~3 s" | 05/10 23:35 | Moto G9 Play | OK: "1º quadro em 3,6 s"; sair da tela sem ANR e sem "late video" no logcat |
+| 11 | RF03 | "Lente fixa" | Reinicia (~3 s) e mostra "A API GDI devolve o mesmo vídeo para as duas lentes desta câmera." | 05/10 23:54 | Moto G9 Play | OK: reiniciou em 2,3 s e mostrou a nota das lentes |
+| 12 | RF03 | Tela cheia, mudo, PTZ, gravar, microfone, foto | Tela cheia não reinicia o vídeo; mudo alterna (sem efeito audível: áudio desativado); os demais mostram o Snackbar "Indisponível na API GDI"/"PTZ não disponível na API GDI" | 05/10 23:55 | Moto G9 Play | OK: tela cheia sem reiniciar o vídeo; PTZ mostra "PTZ não disponível na API GDI" |
+| 13 | RF05 | Abrir a MFR 2030 | "Porta fechada", bateria %, Online, "Pressione e segure para abrir a porta." | 05/10 23:52 | Moto G9 Play | OK após correção: 26 %, Online; a porta estava aberta ("Porta aberta" + "Pressione e segure para trancar a porta."). Antes da correção aparecia "Offline" (ver "Contrato real × Swagger") |
+| 14 | RF05 | Segurar o círculo 600 ms | Diálogo "Destrancar a fechadura?" → **Cancelar** | 05/10 23:56 | Moto G9 Play | OK: "Trancar a fechadura?" (porta aberta); fechado com Voltar, nenhum comando enviado |
+| 15 | RF06 | Cartão Volume | "Volume indisponível (a API respondeu HTTP 500)" + "Tentar de novo"; Mudo/Baixo/Médio/Alto habilitados (não tocar sem autorização) | 05/10 23:37 | Moto G9 Play | OK: "Volume indisponível (a API respondeu HTTP 500)" + "Tentar de novo"; níveis habilitados e não tocados |
+| 16 | RF09 | Histórico | Eventos "Remoto (APP)"/"Por dentro (manual)" com data e hora; "Ver mais" se houver 10 | 05/10 23:37 | Moto G9 Play | OK: 10 eventos reais "Remoto (APP)" com data e hora |
+| 17 | — | Hub MCA 1002 | Online, faixa da semana com hoje em verde, 1 subdispositivo, "Firmware 2.4.628243" com "Atualizado" | 05/10 23:37 | Moto G9 Play; simulador iOS | OK: Online, faixa da semana com hoje em verde, 1 subdispositivo, "Firmware 2.4.628243" "Atualizado" (igual a `app-18`) |
+| 18 | — | Definições → Sair | Volta à tela de token; o "voltar" do sistema não retorna à Home | 05/10 23:56 | Moto G9 Play | OK: voltou ao token; o "voltar" saiu do app; reabrir pediu o token de novo |
+| 19 | — | Repetir 4, 9, 13 e 17 no iPhone | Mesmo comportamento; vídeo via VLCKit (1.º quadro a frio pode passar de 30 s) | 05/10 23:58 | iPhone 13 Pro; simulador iOS | Parcial: no iPhone físico, build assinado instalado e aberto com o token pré-preenchido; 4, 9 e 17 conferidos no simulador. Repetir 4, 9, 13 e 17 no iPhone físico |
 
 Passo final: capturar cada tela no Android (`adb exec-out screencap -p > tela-<nome>.png`) e no iPhone e comparar lado a lado com as capturas de referência do Mibo Smart. Só são aceitas diferenças de recurso que a GDI não oferece ou de conteúdo de outra conta. Depois, salvar as telas finais em `docs/telas/` (`adb exec-out screencap -p > docs/telas/android-<tela>.png`; no iPhone, botões laterais, salvando como `docs/telas/ios-<tela>.png`) e referenciá-las neste README.
 
@@ -249,7 +250,7 @@ Quem tem câmeras, fechadura e hub Intelbras quer, num só app, ver a câmera ao
 | RF08 | Itens por página 2/5/10/50, "Carregar mais", "Sem mais informações", contagem; erro ao carregar mais mantém a lista | Feito |
 | RF09 | Histórico com 10 eventos, "Ver mais" com 30; vazio e erro com textos diferentes | Feito |
 
-A conferência em aparelho real (roteiro de 19 passos dos RF01–RF09 no Android físico e no iPhone, com comparação lado a lado com as capturas de referência do Mibo Smart) está pendente.
+O roteiro de 19 passos (RF01–RF09) foi executado no Android físico com a API real em 05/10/2026, com comparação lado a lado com as capturas de referência; no iOS, o build assinado roda no iPhone e os fluxos principais foram conferidos no simulador com a API real. Pendentes: token vencido real, modo avião e a repetição completa no iPhone físico (seção "Verificação em aparelho").
 
 ### Camadas
 
@@ -313,6 +314,8 @@ Medido na conta de teste entre 02 e 05/10/2026; onde diverge do Swagger, vale o 
 - Fechadura e bateria exigem `ns` composto `NsDispositivo_NsHub_IdProdutoHub`, com o `idProduto` da própria fechadura no corpo.
 - Vídeo: o Swagger promete MP4 por HTTPS, `session_id`, `monitor_url` e cota; a resposta real é **só uma URL RTSP** que expira sozinha. `canalVideo` 0 e 1 devolvem o mesmo RTSP; `streamId 0` → 500.
 - Volume da fechadura → 500 na fechadura de teste; rotas de cota e sessões de streaming → 403 sem plano.
+- **Online de subdispositivo** (medido em 05/10/2026 com este app): `/produtos/online/v1` com o `ns` puro da fechadura Zigbee responde `online:false` mesmo com a listagem dizendo `"status":"online"`; com o `ns` composto responde `true`. Câmera e hub respondem certo com o `ns` puro. O app consulta com o `ns` composto só nos subdispositivos.
+- `criar-fluxo-video` pode voltar HTTP 500 transitório (1.ª chamada a frio em 05/10/2026); uma nova chamada funciona.
 
 ### Métricas medidas
 
@@ -322,6 +325,8 @@ Medido na conta de teste entre 02 e 05/10/2026; onde diverge do Swagger, vale o 
 | 1.º quadro a quente, Android | ~3 s |
 | 1.º quadro a frio, Android | ~21 s (proxy da nuvem; igual em qualquer cliente) |
 | 1.º quadro a frio, iOS | 37,8 s (uma única medição, VLCKit por software) |
+| Com este app no Moto G9 Play (05/10/2026) | 22,6 s a frio; 3,6 s a quente; 2,3 s ao trocar de lente |
+| Com este app no simulador iOS (05/10/2026) | 2,4 s com o proxy já aquecido |
 | APK debug com 3 ABIs | ~165 MB (libVLC) |
 
 ### Próximos passos
@@ -344,4 +349,4 @@ O app foi construído com um agente de IA de código (Claude Code), em **desenvo
 - o contrato da API GDI **medido** na conta de teste, com as divergências do Swagger e as armadilhas de plataforma já encontradas;
 - a lista dos testes esperados e as capturas de referência do app Mibo Smart para cada tela.
 
-A implementação foi dividida entre agentes por área (domínio e dados, telas, vídeo, testes, documentação), presos a um contrato de nomes e assinaturas, com um agente de build compilando e corrigindo no fim. A verificação não depende da palavra do agente: testes unitários em `commonTest` (JVM e simulador iOS), builds Android e iOS, os `grep` da regra de dependência, o CI no GitHub Actions, o roteiro em aparelho real e a comparação lado a lado com as capturas de referência (estes dois últimos pendentes). Comandos físicos na fechadura não são disparados pelo agente: exigem autorização explícita do dono da conta.
+A implementação foi dividida entre agentes por área (domínio e dados, telas, vídeo, testes, documentação), presos a um contrato de nomes e assinaturas, com um agente de build compilando e corrigindo no fim. A verificação não depende da palavra do agente: testes unitários em `commonTest` (JVM e simulador iOS), builds Android e iOS, os `grep` da regra de dependência, o CI no GitHub Actions (a cada push), o roteiro em aparelho real com a API real (no Android físico e parcialmente no iOS) e a comparação lado a lado com as capturas de referência. Comandos físicos na fechadura não são disparados pelo agente: exigem autorização explícita do dono da conta.

@@ -17,6 +17,15 @@ fun onlineLabel(online: Boolean?): String = when (online) { true -> "Online"; fa
 /** Rótulo "compartilhado"; vinculado é o caso comum e não ganha rótulo. */
 fun sharedLabel(origin: DeviceOrigin?): String? = if (origin == DeviceOrigin.SHARED) "compartilhado" else null
 
-/** Subtítulo da linha no modo lista: "MFR 2030 • via hub • compartilhado". */
+private const val VIA_HUB = "via hub"
+
+/** Separador dos rótulos em subtítulos ("MFR 2030 • via hub"); público para a grade usar o mesmo. */
+const val TAG_SEPARATOR = " • "
+
+/** Rótulos do cartão da grade: ["via hub", "compartilhado"] (vazia quando não há nenhum). */
+fun deviceTags(device: Device): List<String> =
+    listOfNotNull(VIA_HUB.takeIf { device.subdevice }, sharedLabel(device.origin))
+
+/** Subtítulo da linha no modo lista: "MFR 2030 • via hub • compartilhado" (mesmos rótulos da grade). */
 fun deviceSubtitle(device: Device): String =
-    listOfNotNull(device.model ?: device.kind.label, "via hub".takeIf { device.subdevice }, sharedLabel(device.origin)).joinToString(" • ")
+    (listOf(device.model ?: device.kind.label) + deviceTags(device)).joinToString(TAG_SEPARATOR)

@@ -103,7 +103,6 @@ private const val HOME_TITLE = "Minha casa ⌄"
 private const val ADD_DEVICE_UNAVAILABLE = "Adicionar dispositivos: use o app Mibo Smart (indisponível na API GDI)"
 private const val SCENES_UNAVAILABLE = "Cenas e automações: indisponível na API GDI"
 private const val STORAGE_PLANS_UNAVAILABLE = "Planos de armazenamento: indisponível nesta demo"
-private const val VIA_HUB = "via hub"
 private const val WEBHOOK_NOTE =
     "A GDI envia eventos de movimento e de abertura por webhook, que exige um backend; este app não recebe eventos em tempo real."
 
@@ -475,7 +474,8 @@ private fun CameraCard(device: Device, modifier: Modifier, onClick: () -> Unit) 
 
 @Composable
 private fun DeviceCard(device: Device, modifier: Modifier, onClick: () -> Unit) {
-    val subtitle = listOfNotNull(VIA_HUB.takeIf { device.subdevice }, sharedLabel(device.origin)).joinToString(" • ")
+    // Rótulos vêm do MiboLogic: o texto da regra fica num só lugar (seção 4.1).
+    val subtitle = deviceTags(device).joinToString(TAG_SEPARATOR)
     Surface(
         onClick = onClick,
         modifier = modifier.defaultMinSize(minHeight = 150.dp),

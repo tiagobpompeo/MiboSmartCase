@@ -7,7 +7,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
@@ -17,6 +19,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -112,8 +115,10 @@ private const val LOCK_LONG_PRESS_MS = 600L
 private const val LOW_BATTERY_PERCENT = 30
 /** Onde o degradê verde-claro do topo da fechadura termina no fundo da página (seção 6.6). */
 private const val LOCK_GRADIENT_END = 0.45f
-/** Altura do cabeçalho cinza do hub medida em hub-mca1002.jpg. */
+/** Altura mínima do cabeçalho cinza do hub medida em hub-mca1002.jpg; cresce se o conteúdo não couber, ex.: status bar de 62 pt do iPhone. */
 private const val HUB_HEADER_FRACTION = 0.42f
+/** Fatia da linha do cabeçalho para o desenho do hub (~150 dp de 371 dp, como em app-18). */
+private const val HUB_DRAWING_WEIGHT = 0.68f
 /** Botão central do hub grande: 44 dp num disco de 200 dp. */
 private const val HUB_CENTER_FRACTION = 44f / 200f
 private const val TEXT_PLACEHOLDER = "—"
@@ -169,6 +174,7 @@ private fun ScreenHeader(
             fontWeight = FontWeight.Bold,
             textAlign = if (centered) TextAlign.Center else TextAlign.Start,
             maxLines = 1,
+            softWrap = false, // no iOS o nome quebrava no meio (armadilha 31)
             overflow = TextOverflow.Ellipsis,
         )
         actions()
@@ -356,7 +362,7 @@ private fun LockCircle(open: Boolean?, consulting: Boolean, enabled: Boolean, on
 private fun LockActions(volumeOpen: Boolean, onVolume: () -> Unit, onHistory: () -> Unit, volumeControls: @Composable () -> Unit) {
     Surface(Modifier.fillMaxWidth().padding(horizontal = 16.dp), shape = RoundedCornerShape(16.dp), color = MiboColors.Card) {
         Column(Modifier.padding(20.dp)) {
-            Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 ActionCircle(Icons.AutoMirrored.Filled.VolumeUp, "Volume", MiboColors.ActionGreen, onVolume)
                 ActionCircle(Icons.Default.History, "Histórico", MiboColors.ActionBlue, onHistory)
             }
@@ -580,22 +586,26 @@ private fun HubScreen(vm: HomeViewModel, hub: Device, children: List<Device>, on
     val days = remember { weekStrip() }
     val today = remember { todayMonthDay() }
 
-    Column(Modifier.fillMaxSize()) {
-        HubHeader(
-            hub, online, onBack, onInfo,
-            onDevices = { showMessages = false },
-            onFirmware = { firmwareOpen = true },
-            modifier = Modifier.fillMaxWidth().fillMaxHeight(HUB_HEADER_FRACTION),
-        )
-        Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 24.dp, top = 16.dp)) {
-            HubTab("Acessório", selected = !showMessages) { showMessages = false }
-            HubTab("Mensagens", selected = showMessages) { showMessages = true }
-            Spacer(Modifier.weight(1f))
-            Text(today, Modifier.padding(top = 10.dp), color = MiboColors.TextSecondary, fontSize = 13.sp)
-        }
-        WeekStrip(days)
-        Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp)) {
-            if (showMessages) HubMessages() else HubAccessories(hub, children)
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        // 42 % é o mínimo: no iPhone a status bar alta espremia o Wi-Fi e escondia o "Online", então o cabeçalho cresce.
+        val headerMinHeight = maxHeight * HUB_HEADER_FRACTION
+        Column(Modifier.fillMaxSize()) {
+            HubHeader(
+                hub, online, onBack, onInfo,
+                onDevices = { showMessages = false },
+                onFirmware = { firmwareOpen = true },
+                modifier = Modifier.fillMaxWidth().heightIn(min = headerMinHeight).height(IntrinsicSize.Min),
+            )
+            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 24.dp, top = 16.dp)) {
+                HubTab("Acessório", selected = !showMessages) { showMessages = false }
+                HubTab("Mensagens", selected = showMessages) { showMessages = true }
+                Spacer(Modifier.weight(1f))
+                Text(today, Modifier.padding(top = 10.dp), color = MiboColors.TextSecondary, fontSize = 13.sp)
+            }
+            WeekStrip(days)
+            Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp)) {
+                if (showMessages) HubMessages() else HubAccessories(hub, children)
+            }
         }
     }
     if (firmwareOpen) FirmwareDialog(vm, hub) { firmwareOpen = false }
@@ -629,13 +639,16 @@ private fun HubHeader(
                     Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(24.dp), tint = MiboColors.TextPrimary)
                     Text(onlineLabel(online), color = MiboColors.TextPrimary, fontSize = 14.sp)
                 }
-                HubDrawing(
-                    Modifier.sizeIn(maxWidth = 200.dp, maxHeight = 200.dp).fillMaxHeight().aspectRatio(1f),
-                    ring = HubRingLarge,
-                    ringWidth = 3.dp,
-                    centerFraction = HUB_CENTER_FRACTION,
-                    shadow = 4.dp,
-                )
+                // Fatia com peso: a medição intrínseca e o layout real dão ao nome a mesma largura (Canvas tem largura intrínseca 0).
+                Box(Modifier.weight(HUB_DRAWING_WEIGHT).fillMaxHeight(), contentAlignment = Alignment.CenterEnd) {
+                    HubDrawing(
+                        Modifier.sizeIn(maxWidth = 200.dp, maxHeight = 200.dp).aspectRatio(1f, matchHeightConstraintsFirst = true),
+                        ring = HubRingLarge,
+                        ringWidth = 3.dp,
+                        centerFraction = HUB_CENTER_FRACTION,
+                        shadow = 4.dp,
+                    )
+                }
             }
             Row(Modifier.fillMaxWidth().padding(bottom = 16.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
                 RoundAction(Icons.Default.Devices, "Dispositivos", onDevices)
@@ -721,7 +734,7 @@ private fun ChildRow(child: Device) {
             )
             Spacer(Modifier.width(16.dp))
             Column {
-                Text(child.name, color = MiboColors.TextPrimary, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(child.name, color = MiboColors.TextPrimary, fontSize = 16.sp, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                 Text(
                     listOf(child.model ?: child.kind.label, onlineLabel(child.online).lowercase()).joinToString(" • "),
                     color = MiboColors.TextSecondary,

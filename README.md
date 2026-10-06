@@ -31,11 +31,13 @@ O token nunca está no repositório. Ele entra pela tela de token e só é grava
 
 ### JDK no terminal
 
-O Mac de desenvolvimento não tem JDK de sistema. Antes de qualquer `./gradlew` no terminal, e antes de compilar pela interface do Xcode (a fase "Compile Kotlin Framework" chama o Gradle), use o JBR do Android Studio:
+O Mac de desenvolvimento não tem JDK de sistema. Antes de qualquer `./gradlew` ou `xcodebuild` no terminal, use o JBR do Android Studio:
 
 ```sh
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 ```
+
+Pela interface do Xcode, a fase "Compile Kotlin Framework" chama o Gradle no ambiente do próprio Xcode, que não herda o `export` do terminal. Feche o Xcode e abra o projeto pelo terminal já com o JDK: `open --env JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" iosApp/iosApp.xcodeproj`. Como alternativa, use `launchctl setenv JAVA_HOME "/Applications/Android Studio.app/Contents/jbr/Contents/Home"` e reabra o Xcode (vale até o logout).
 
 Rodando o iOS pelo Android Studio isso não é necessário: a IDE compila o framework e o script do Xcode pula o Gradle (`OVERRIDE_KOTLIN_BUILD_IDE_SUPPORTED=YES`).
 
@@ -44,7 +46,7 @@ Rodando o iOS pelo Android Studio isso não é necessário: a IDE compila o fram
 ```properties
 sdk.dir=/Users/<voce>/Library/Android/sdk
 # Opcional: só pré-preenche a tela de token em desenvolvimento (o token vale cerca de 2 h).
-gdi.token=<token temporário gerado no portal>
+gdi.token = <token temporário gerado no portal>
 # Opcional; este já é o padrão:
 # gdi.baseUrl=https://api-casainteligente.intelbras.com.br
 ```
@@ -116,7 +118,7 @@ Fora de propósito: **sem Media3** (o RTSP da nuvem não é aceito por ele; ver 
 
 ## Testes
 
-**85 testes** unitários em 14 classes (o case pede ≥ 70), todos em `shared/src/commonTest/kotlin/br/com/pompeo/casa/`. Usam `kotlin.test`, `kotlinx-coroutines-test` e `ktor-client-mock`, sem JUnit nem MockK: os dublês são fakes das interfaces do domínio (`TestSupport.kt`) e todo token é obviamente falso.
+**85 testes** unitários em 14 classes (meta do projeto: ≥ 70), todos em `shared/src/commonTest/kotlin/br/com/pompeo/casa/`. Usam `kotlin.test`, `kotlinx-coroutines-test` e `ktor-client-mock`, sem JUnit nem MockK: os dublês são fakes das interfaces do domínio (`TestSupport.kt`) e todo token é obviamente falso.
 
 ```sh
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
@@ -223,7 +225,7 @@ Preparação: apagar os dados do app (`adb shell pm clear br.com.pompeo.casa`; n
 | 18 | — | Definições → Sair | Volta à tela de token; o "voltar" do sistema não retorna à Home | | | |
 | 19 | — | Repetir 4, 9, 13 e 17 no iPhone | Mesmo comportamento; vídeo via VLCKit (1.º quadro a frio pode passar de 30 s) | | | |
 
-Passo final: capturar cada tela no Android (`adb exec-out screencap -p > tela-<nome>.png`) e no iPhone e comparar lado a lado com as capturas de referência do Mibo Smart. Só são aceitas diferenças de recurso que a GDI não oferece ou de conteúdo de outra conta.
+Passo final: capturar cada tela no Android (`adb exec-out screencap -p > tela-<nome>.png`) e no iPhone e comparar lado a lado com as capturas de referência do Mibo Smart. Só são aceitas diferenças de recurso que a GDI não oferece ou de conteúdo de outra conta. Depois, salvar as telas finais em `docs/telas/` (`adb exec-out screencap -p > docs/telas/android-<tela>.png`; no iPhone, botões laterais, salvando como `docs/telas/ios-<tela>.png`) e referenciá-las neste README.
 
 ---
 
@@ -247,7 +249,7 @@ Quem tem câmeras, fechadura e hub Intelbras quer, num só app, ver a câmera ao
 | RF08 | Itens por página 2/5/10/50, "Carregar mais", "Sem mais informações", contagem; erro ao carregar mais mantém a lista | Feito |
 | RF09 | Histórico com 10 eventos, "Ver mais" com 30; vazio e erro com textos diferentes | Feito |
 
-A conferência em aparelho real (seção "Verificação em aparelho") está pendente.
+A conferência em aparelho real (roteiro de 19 passos dos RF01–RF09 no Android físico e no iPhone, com comparação lado a lado com as capturas de referência do Mibo Smart) está pendente.
 
 ### Camadas
 
@@ -276,7 +278,7 @@ Só `data/gdi` conhece a GDI (rotas, nomes de campo, códigos de erro, formato d
 
 ### Modularização
 
-Hoje: um módulo Gradle `shared` (mais `androidApp` e `iosApp`), com fronteiras por pacote (`ui` → `domain` ← `data`) conferidas pelos `grep` da seção "Arquitetura". Para o tamanho do case isso mantém o build simples. Quando o app crescer, a divisão prevista é:
+Hoje: um módulo Gradle `shared` (mais `androidApp` e `iosApp`), com fronteiras por pacote (`ui` → `domain` ← `data`) conferidas por três buscas de `import` que têm de vir vazias: `domain` sem Ktor, Koin, Compose, `androidx`, `kotlinx.serialization` nem outras camadas; `ui`, `player` e `App.kt` sem `data` nem Ktor; `HomeViewModel` só com imports de `domain`. Para o tamanho do case isso mantém o build simples. Quando o app crescer, a divisão prevista é:
 
 | Módulo | Conteúdo |
 |---|---|

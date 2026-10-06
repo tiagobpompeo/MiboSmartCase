@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
@@ -49,6 +50,10 @@ fun App() {
         // Decidido UMA vez (senão o NavHost trocaria de destino a cada recomposição). Validação em andamento
         // (token só na sessão) volta para a tela de token, que mostra o progresso.
         val start: Any = remember { if (vm.token.value != null && vm.tokenValidation.value !is TokenValidation.Validating) HomeRoute else TokenRoute }
+        // Só desempilha se a entrada ainda é o topo: um 2.º toque em "voltar" durante a transição de saída
+        // (ou o onBack da armadilha 33) desempilharia a Home e deixaria o NavHost em branco (beco sem saída no iOS).
+        // Não use dropUnlessResumed: na transição de entrada a tela está só STARTED e o toque legítimo se perderia.
+        val popIfTop: (NavBackStackEntry) -> Unit = { entry -> if (nav.currentBackStackEntry?.id == entry.id) nav.popBackStack() }
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             NavHost(nav, startDestination = start) {
                 composable<TokenRoute> {
@@ -65,8 +70,8 @@ fun App() {
                         onLogout = { vm.logout(); nav.navigate(TokenRoute) { popUpTo<HomeRoute> { inclusive = true } } },
                     )
                 }
-                composable<CameraRoute> { entry -> CameraScreen(vm, entry.toRoute<CameraRoute>().ns, onBack = { nav.popBackStack() }) }
-                composable<DeviceRoute> { entry -> DeviceScreen(vm, entry.toRoute<DeviceRoute>().ns, onBack = { nav.popBackStack() }) }
+                composable<CameraRoute> { entry -> CameraScreen(vm, entry.toRoute<CameraRoute>().ns, onBack = { popIfTop(entry) }) }
+                composable<DeviceRoute> { entry -> DeviceScreen(vm, entry.toRoute<DeviceRoute>().ns, onBack = { popIfTop(entry) }) }
             }
         }
     }

@@ -379,7 +379,11 @@ class DeviceRepositoryImplTest {
         // Arrange: dois parceiros; cada câmera pertence a um.
         val fake = FakeProvider(emptyList())
         val other = FakeProvider(emptyList(), id = OTHER_PROVIDER)
-        val repo = signedIn(fake, other)
+        // Nome próprio no 2.º parceiro (o FakeProvider tem nome fixo): providerName precisa achar o parceiro certo.
+        val otherNamed = object : DeviceProvider by other {
+            override val displayName: String = OTHER_PROVIDER_NAME
+        }
+        val repo = signedIn(fake, otherNamed)
         val camera = device("CAM1")
         val otherCamera = device("CAM2", providerId = OTHER_PROVIDER)
         // Act
@@ -391,7 +395,9 @@ class DeviceRepositoryImplTest {
         assertEquals(listOf(0, 1, 0), fake.liveChannels)
         assertEquals(listOf(1), other.liveChannels)
         assertEquals("rtsp://fake/CAM2", otherSession.streamUrl)
-        assertEquals(other.displayName, repo.providerName(otherCamera))
+        assertEquals(fake.displayName, repo.providerName(camera))
+        assertEquals(OTHER_PROVIDER_NAME, repo.providerName(otherCamera))
+        assertEquals(listOf(fake.displayName, OTHER_PROVIDER_NAME), repo.providerNames)
         assertNull(repo.providerName(device("X1", providerId = "desconhecido")))
     }
 
@@ -409,5 +415,6 @@ class DeviceRepositoryImplTest {
     private companion object {
         const val SESSION_TOKEN = "Ot_session_000001"
         const val OTHER_PROVIDER = "outro"
+        const val OTHER_PROVIDER_NAME = "Outro parceiro"
     }
 }

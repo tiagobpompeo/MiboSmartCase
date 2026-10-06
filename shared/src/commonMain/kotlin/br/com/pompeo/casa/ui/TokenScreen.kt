@@ -103,8 +103,9 @@ fun TokenScreen(vm: HomeViewModel, onConnected: () -> Unit) {
         SubmitButton(validating = validating, enabled = canSubmit, onClick = ::submit)
         error?.let { ValidationError(it) }
         Spacer(Modifier.height(32.dp)) // espaço fixo: weight não funciona em coluna rolável
+        // Domínio inteiro na 2.ª linha, como em app-01: sem a quebra explícita o iOS parte o host no hífen de "api-".
         Text(
-            "O token nunca é enviado para fora do domínio api-casainteligente.intelbras.com.br.",
+            "O token nunca é enviado para fora do domínio\napi-casainteligente.intelbras.com.br.",
             Modifier.padding(top = 24.dp),
             color = MiboColors.TextSecondary,
             fontSize = 11.sp,

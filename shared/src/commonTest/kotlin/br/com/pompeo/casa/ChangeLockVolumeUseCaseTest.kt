@@ -1,7 +1,9 @@
 package br.com.pompeo.casa
 
+import br.com.pompeo.casa.domain.model.Device
 import br.com.pompeo.casa.domain.model.DeviceKind
 import br.com.pompeo.casa.domain.model.LockVolume
+import br.com.pompeo.casa.domain.repository.DeviceRepository
 import br.com.pompeo.casa.domain.usecase.ChangeLockVolumeUseCase
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -13,14 +15,22 @@ class ChangeLockVolumeUseCaseTest {
 
     @Test
     fun writesThenRereadsTheVolume() = runTest {
-        // Arrange
+        // Arrange: a releitura devolve um valor diferente do pedido, para provar que o caso de uso mostra a releitura.
         val locks = FakeLockController()
-        val changeVolume = ChangeLockVolumeUseCase(FakeDeviceRepository(FakeTokenRepository(), locks = locks))
+        var rereads = 0
+        val devices = object : DeviceRepository by FakeDeviceRepository(FakeTokenRepository(), locks = locks) {
+            override suspend fun lockVolume(lock: Device): LockVolume? {
+                rereads++
+                return LockVolume.MEDIUM
+            }
+        }
+        val changeVolume = ChangeLockVolumeUseCase(devices)
         // Act
         val shown = changeVolume(lock, LockVolume.HIGH)
         // Assert
-        assertEquals(LockVolume.HIGH, shown)
-        assertEquals(LockVolume.HIGH, locks.volume)
+        assertEquals(LockVolume.HIGH, locks.volume, "gravou o volume pedido")
+        assertEquals(1, rereads, "releu depois de gravar")
+        assertEquals(LockVolume.MEDIUM, shown, "devolve o volume relido, não o pedido")
     }
 
     @Test

@@ -115,7 +115,11 @@ class SubmitTokenUseCaseTest {
         val tokens = FakeTokenRepository()
         val devices = FakeDeviceRepository(tokens, firstPageDelayMs = 1_000)
         val submitToken = SubmitTokenUseCase(tokens, devices)
-        val validation = launch { submitToken("Ot_interrupted_0123") }
+        var returned = false
+        val validation = launch {
+            submitToken("Ot_interrupted_0123")
+            returned = true // só chega aqui se invoke engolir o cancelamento e devolver um AppError
+        }
         runCurrent()
         assertEquals("Ot_interrupted_0123", tokens.token.value)
         // Act
@@ -125,6 +129,7 @@ class SubmitTokenUseCaseTest {
         assertNull(tokens.token.value)
         assertEquals(DevicesState.NoToken, devices.state.value)
         assertTrue(tokens.persistedValues.isEmpty())
+        assertFalse(returned, "o cancelamento é relançado: invoke não devolve um AppError")
     }
 
     @Test

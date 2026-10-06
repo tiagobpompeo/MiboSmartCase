@@ -10,6 +10,7 @@ dependencies {
     implementation(projects.shared)
     implementation(libs.androidx.activity.compose)
     implementation(libs.koin.android)
+    testImplementation(libs.junit) // TokenFormatJavaTest: teste em Java chamando o Kotlin do shared
 }
 
 android {

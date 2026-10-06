@@ -305,24 +305,32 @@ private fun StorageBanner(onClick: () -> Unit) {
         color = MiboColors.GreenBright,
     ) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(
-                "Armazenamento Complementar por Fotos",
-                Modifier.weight(1.2f),
+            // Linhas fixas como no banner do Mibo; em tela estreita a fonte diminui em vez de quebrar a palavra.
+            FitText(
+                "Armazenamento\nComplementar\npor Fotos",
+                maxSize = 17.sp,
+                minSize = 11.sp,
+                modifier = Modifier.weight(1.2f),
                 color = BannerTitle,
-                fontSize = 17.sp,
                 fontWeight = FontWeight.Bold,
             )
             Icon(Icons.Default.PhotoCamera, contentDescription = null, modifier = Modifier.size(64.dp), tint = Color.White)
             Column(Modifier.weight(1f), horizontalAlignment = Alignment.End) {
-                Text("Mais registros para sua câmera", color = Color.White, fontSize = 12.sp, textAlign = TextAlign.End)
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Contratar agora",
-                    Modifier.background(BannerPill, CircleShape).padding(horizontal = 12.dp, vertical = 8.dp),
+                FitText(
+                    "Mais registros para\nsua câmera",
+                    maxSize = 12.sp,
+                    minSize = 9.sp,
                     color = Color.White,
-                    fontSize = 12.sp,
+                    textAlign = TextAlign.End,
+                )
+                Spacer(Modifier.height(8.dp))
+                FitText(
+                    "Contratar agora",
+                    maxSize = 12.sp,
+                    minSize = 8.sp,
+                    modifier = Modifier.background(BannerPill, CircleShape).padding(horizontal = 12.dp, vertical = 8.dp),
+                    color = Color.White,
                     fontWeight = FontWeight.SemiBold,
-                    textAlign = TextAlign.Center,
                 )
             }
         }
@@ -453,16 +461,8 @@ private fun CameraCard(device: Device, modifier: Modifier, onClick: () -> Unit) 
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Column(Modifier.weight(1f)) {
-                    // softWrap = false: no iOS o nome quebrava no meio em vez de virar reticências.
-                    Text(
-                        device.name,
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Normal,
-                        color = MiboColors.TextPrimary,
-                        maxLines = 1,
-                        softWrap = false,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                    // Uma linha que encolhe até caber: no iOS o nome quebrava no meio ou virava reticências.
+                    FitText(device.name, maxSize = 16.sp, minSize = 12.sp, fontWeight = FontWeight.Normal)
                     sharedLabel(device.origin)?.let { Text(it, fontSize = 11.sp, color = MiboColors.TextSecondary) }
                 }
                 Text("••", color = MiboColors.TextSecondary)
@@ -486,15 +486,7 @@ private fun DeviceCard(device: Device, modifier: Modifier, onClick: () -> Unit) 
             OnlineDot(device.online)
             Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { DeviceDrawing(device) }
             Spacer(Modifier.height(8.dp))
-            Text(
-                device.name,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = MiboColors.TextPrimary,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Ellipsis,
-            )
+            FitText(device.name, maxSize = 18.sp, minSize = 13.sp, fontWeight = FontWeight.Bold)
             if (subtitle.isNotEmpty()) Text(subtitle, fontSize = 11.sp, color = MiboColors.TextSecondary)
         }
     }
@@ -520,15 +512,7 @@ private fun DeviceRow(device: Device, onClick: () -> Unit) {
             }
             Spacer(Modifier.width(16.dp))
             Column(Modifier.weight(1f)) {
-                Text(
-                    device.name,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MiboColors.TextPrimary,
-                    maxLines = 1,
-                    softWrap = false,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                FitText(device.name, maxSize = 16.sp, minSize = 12.sp, fontWeight = FontWeight.Bold)
                 Text(
                     deviceSubtitle(device),
                     fontSize = 12.sp,

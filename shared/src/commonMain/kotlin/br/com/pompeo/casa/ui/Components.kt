@@ -14,6 +14,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.TextAutoSize
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBackIosNew
 import androidx.compose.material.icons.filled.DevicesOther
@@ -26,6 +28,7 @@ import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
@@ -39,8 +42,12 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import br.com.pompeo.casa.domain.model.Device
@@ -60,6 +67,7 @@ private const val PLAY_ICON_FRACTION = 0.55f
 private const val LENS_BADGE_ALPHA = 0.7f
 /** Largura da coluna de rótulos no diálogo de informações, medida em app-13-camera-informacoes.png. */
 private const val INFO_KEY_WEIGHT = 0.48f
+private val FIT_TEXT_STEP = 0.5.sp
 
 /** Snackbar por tela. Descarta o aviso anterior: toques repetidos não enfileiram segundos de espera. */
 class Snack(val host: SnackbarHostState, private val scope: CoroutineScope) {
@@ -214,4 +222,38 @@ private fun InfoRow(label: String, value: String) {
         Text(label, Modifier.weight(INFO_KEY_WEIGHT), color = MiboColors.TextSecondary)
         Text(value, Modifier.weight(1f - INFO_KEY_WEIGHT), color = MiboColors.TextPrimary)
     }
+}
+
+/**
+ * Texto que reduz a fonte até caber (no mínimo [minSize]) em vez de quebrar palavra no meio ou cortar com
+ * reticências: no iPhone de 390 pt o banner quebrava "Armazenament|o" e nomes como "MFR 2030-1B35" viravam
+ * "MFR 2030-1B…". Não quebra linha sozinho: as linhas são as do próprio [text] (separadas por '\n'). Abaixo de
+ * [minSize] o excesso é cortado; os mínimos de quem chama cobrem os nomes reais da conta com folga.
+ */
+@Composable
+fun FitText(
+    text: String,
+    maxSize: TextUnit,
+    minSize: TextUnit,
+    modifier: Modifier = Modifier,
+    color: Color = MiboColors.TextPrimary,
+    fontWeight: FontWeight? = null,
+    textAlign: TextAlign = TextAlign.Unspecified,
+    /** Em `em` acompanha a fonte reduzida; sem valor, vale o do tema (24 sp, bom só para texto pequeno). */
+    lineHeight: TextUnit = TextUnit.Unspecified,
+) {
+    val lineCount = text.count { it == '\n' } + 1
+    BasicText(
+        text = text,
+        modifier = modifier,
+        style = LocalTextStyle.current.merge(
+            TextStyle(color = color, fontSize = maxSize, fontWeight = fontWeight, textAlign = textAlign, lineHeight = lineHeight),
+        ),
+        // Clip e não Ellipsis: o autoSize detecta o estouro de largura nas duas plataformas; com Ellipsis ele
+        // depende de a linha vir marcada como "ellipsized", o que o iOS (Skia) não informa, e o texto não encolhia.
+        overflow = TextOverflow.Clip,
+        softWrap = false,
+        maxLines = lineCount,
+        autoSize = TextAutoSize.StepBased(minFontSize = minSize, maxFontSize = maxSize, stepSize = FIT_TEXT_STEP),
+    )
 }

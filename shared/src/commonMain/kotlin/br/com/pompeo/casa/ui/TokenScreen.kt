@@ -75,11 +75,12 @@ fun TokenScreen(vm: HomeViewModel, onConnected: () -> Unit) {
     ) {
         Spacer(Modifier.height(32.dp))
         Icon(Icons.Default.Security, contentDescription = null, modifier = Modifier.size(64.dp), tint = MiboColors.Green)
-        Text(
+        // Uma linha como em app-01: no iPhone de 390 pt o título quebrava em duas.
+        FitText(
             "Conectar à conta Intelbras",
-            Modifier.padding(top = 16.dp),
-            color = MiboColors.TextPrimary,
-            fontSize = 26.sp,
+            maxSize = 26.sp,
+            minSize = 20.sp,
+            modifier = Modifier.padding(top = 16.dp),
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
         )

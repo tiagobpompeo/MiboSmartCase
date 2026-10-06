@@ -91,6 +91,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import br.com.pompeo.casa.domain.model.Device
@@ -111,6 +112,7 @@ const val REMOTE_HINT = "Habilite a abertura remota no app Mibo Smart para coman
 
 /** Segurar 600 ms (RF05): mais longo que o padrão da plataforma, para a porta não abrir por um toque demorado. */
 private const val LOCK_LONG_PRESS_MS = 600L
+private val HUB_NAME_LINE_HEIGHT = 1.12.em
 /** Abaixo disso a bateria fica âmbar, como o "26%" de fechadura-mfr2030.jpg. */
 private const val LOW_BATTERY_PERCENT = 30
 /** Onde o degradê verde-claro do topo da fechadura termina no fundo da página (seção 6.6). */
@@ -626,14 +628,14 @@ private fun HubHeader(
             ScreenHeader(hub.name, onBack, titleSize = 20.sp, centered = true) { InfoButton(onInfo) }
             Row(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(
-                        hub.name,
-                        color = MiboColors.TextPrimary,
-                        fontSize = 34.sp,
-                        lineHeight = 38.sp,
+                    // Duas linhas como em hub-mca1002.jpg ("MCA" / "1002-0912"); em tela estreita a fonte diminui
+                    // em vez de quebrar o número no hífen.
+                    FitText(
+                        hub.name.replaceFirst(' ', '\n'),
+                        maxSize = 34.sp,
+                        minSize = 20.sp,
                         fontWeight = FontWeight.Bold,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
+                        lineHeight = HUB_NAME_LINE_HEIGHT,
                     )
                     Spacer(Modifier.height(12.dp))
                     Icon(Icons.Default.Wifi, contentDescription = null, modifier = Modifier.size(24.dp), tint = MiboColors.TextPrimary)

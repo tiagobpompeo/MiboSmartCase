@@ -5,6 +5,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
@@ -99,6 +100,11 @@ private const val FIRST_FRAME_ALPHA = 0.6f
 
 private val PtzCloseBg = Color(0xFF3A3A3A)
 private val ToolbarIconSize = 28.dp
+
+// Margens do aviso de erro: abaixo do selo "1/1" e acima dos botões Multiview/Tela cheia.
+private val ErrorOverlayTopInset = 52.dp
+private val ErrorOverlayBottomInset = 56.dp
+private const val ERROR_MAX_LINES = 3
 
 @Composable
 fun CameraScreen(vm: HomeViewModel, ns: String, onBack: () -> Unit) {
@@ -282,17 +288,26 @@ private fun LoadingOverlay(progress: PlayerProgress, modifier: Modifier = Modifi
     }
 }
 
+/** Fica entre o selo e os botões do vídeo: em tela estreita (iPhone de 390 pt) a caixa cobria os dois. */
 @Composable
 private fun ErrorOverlay(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
     Column(
         modifier
-            .padding(24.dp)
+            .padding(start = 16.dp, end = 16.dp, top = ErrorOverlayTopInset, bottom = ErrorOverlayBottomInset)
             .background(Color.Black.copy(alpha = BADGE_ALPHA), RoundedCornerShape(8.dp))
-            .padding(16.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        Text(message, color = Color.White, textAlign = TextAlign.Center)
-        TextButton(onClick = onRetry) { Text("Tentar novamente") }
+        Text(
+            message,
+            color = Color.White,
+            fontSize = 13.sp,
+            lineHeight = 18.sp,
+            textAlign = TextAlign.Center,
+            maxLines = ERROR_MAX_LINES,
+            overflow = TextOverflow.Ellipsis,
+        )
+        TextButton(onClick = onRetry, contentPadding = PaddingValues(horizontal = 12.dp)) { Text("Tentar novamente") }
     }
 }
 

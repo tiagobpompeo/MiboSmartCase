@@ -205,7 +205,7 @@ grep -n "^import br\.com\.pompeo\.casa\." "$SRC/ui/HomeViewModel.kt" | grep -v "
 
 ## Verificação em aparelho
 
-**Estado: executado em 05 e 06/10/2026 no Moto G9 Play (Android 11) e no iPhone 13 Pro com a API real e a conta de teste** (iPhone 13 Pro físico em 06/10/2026, com a API real: token vencido, Home, vídeo ao vivo, fechadura e hub). A linha 8 ainda depende do modo avião no aparelho; foi conferida só no simulador, contra um servidor local que imita o contrato da seção "Contrato real × Swagger". Nenhum comando de fechadura ou de volume foi confirmado.
+**Estado: executado em 05 e 06/10/2026 no Moto G9 Play (Android 11) e no iPhone 13 Pro com a API real e a conta de teste** (iPhone 13 Pro físico em 06/10/2026, com a API real: token vencido, Home, vídeo ao vivo, fechadura e hub). Na linha 8, o caso (a), sem rede, foi conferido no iPhone físico; o caso (b), erro ao carregar mais, só contra um servidor local que imita o contrato da seção "Contrato real × Swagger". Nenhum comando de fechadura ou de volume foi confirmado.
 
 Preparação: apagar os dados do app (`adb shell pm clear br.com.pompeo.casa`; no iPhone, apagar e reinstalar), gerar um token novo no portal e colocá-lo em `local.properties` ou colá-lo na tela. Comandos de fechadura e de volume só são confirmados com autorização explícita do dono da conta.
 
@@ -218,7 +218,7 @@ Preparação: apagar os dados do app (`adb shell pm clear br.com.pompeo.casa`; n
 | 5 | RF01 | Fechar e reabrir o app | Vai direto para a Home (token do Keystore/Keychain) | 05/10 23:52 | Moto G9 Play | OK: abriu direto na Home |
 | 6 | RF07 | Chips Compartilhados → Vinculados → Todos | Compartilhados: "Nenhum dispositivo encontrado" + "Nenhum dispositivo compartilhado com esta conta."; os outros: 3 dispositivos | 05/10 23:53 | Moto G9 Play | OK: Compartilhados vazio com o texto do filtro (igual a `app-05`); Vinculados e Todos com 3 |
 | 7 | RF08 | Definições → Itens por página 2 → Início → "Carregar mais" | "1 página(s) · 2 dispositivo(s) · 2 por página" + "Carregar mais" → "2 página(s) · 3 dispositivo(s) · 2 por página" + "Sem mais informações" | 05/10 23:54 | Moto G9 Play | OK: "1 página(s) · 2 dispositivo(s) · 2 por página" → "2 página(s) · 3 dispositivo(s) · 2 por página" + "Sem mais informações" |
-| 8 | RF04/RF08 | (a) Modo avião → Definições → Atualizar → Início. (b) Sem modo avião, 2 por página e só a 1.ª página → ligar o modo avião → "Carregar mais" | (a) Cartão "Sem conexão com a internet…" com "Tentar novamente"; a lista anterior não some das telas de detalhe. (b) Os 2 itens continuam; abaixo, "Sem conexão…" + "Tentar novamente" (que, sem modo avião, carrega a página 2) | — | Simulador (mock) | Parcial: "Sem conexão…" conferido contra o mock fora do ar; modo avião no aparelho pendente |
+| 8 | RF04/RF08 | (a) Modo avião → Definições → Atualizar → Início. (b) Sem modo avião, 2 por página e só a 1.ª página → ligar o modo avião → "Carregar mais" | (a) Cartão "Sem conexão com a internet…" com "Tentar novamente"; a lista anterior não some das telas de detalhe. (b) Os 2 itens continuam; abaixo, "Sem conexão…" + "Tentar novamente" (que, sem modo avião, carrega a página 2) | 06/10 12:58 | iPhone 13 Pro | (a) OK no iPhone físico, sem rede real: Definições → Atualizar → Início mostrou "Sem conexão com a internet. Verifique a rede e tente novamente." com "Tentar novamente" (o detalhe técnico do iOS só aparece porque o build é de debug). (b) conferido só contra o mock no simulador |
 | 9 | RF03 | Abrir a iM4 Dual (a frio) | % e etapa sobem; depois "AO VIVO" e "1º quadro em ~21 s" | 05/10 23:34 | Moto G9 Play; simulador iOS | OK: % e etapa, "AO VIVO", "1º quadro em 22,6 s" a frio no Android (a 1.ª sessão voltou HTTP 500 transitório; "Tentar novamente" resolveu); iOS com VLCKit: 2,4 s com o proxy já aquecido |
 | 10 | RF03 | Voltar e abrir de novo | "1º quadro em ~3 s" | 05/10 23:35 | Moto G9 Play | OK: "1º quadro em 3,6 s"; sair da tela sem ANR e sem "late video" no logcat |
 | 11 | RF03 | "Lente fixa" | Reinicia (~3 s) e mostra "A API GDI devolve o mesmo vídeo para as duas lentes desta câmera." | 05/10 23:54 | Moto G9 Play | OK: reiniciou em 2,3 s e mostrou a nota das lentes |
@@ -255,7 +255,7 @@ Quem tem câmeras, fechadura e hub Intelbras quer, num só app, ver a câmera ao
 | RF08 | Itens por página 2/5/10/50, "Carregar mais", "Sem mais informações", contagem; erro ao carregar mais mantém a lista | Feito |
 | RF09 | Histórico com 10 eventos, "Ver mais" com 30; vazio e erro com textos diferentes | Feito |
 
-O roteiro de 19 passos (RF01–RF09) foi executado no Android físico com a API real em 05/10/2026, com comparação lado a lado com as capturas de referência; no iPhone físico, token vencido, Home, vídeo ao vivo, fechadura e hub foram conferidos com a API real em 06/10/2026. Pendente: modo avião no aparelho (detalhes na seção "Verificação em aparelho" do README do repositório).
+O roteiro de 19 passos (RF01–RF09) foi executado no Android físico com a API real em 05/10/2026, com comparação lado a lado com as capturas de referência; no iPhone físico, token vencido, Home, vídeo ao vivo, fechadura e hub foram conferidos com a API real em 06/10/2026. Pendente: o erro ao "Carregar mais" sem rede (linha 8b), conferido só contra o servidor local (detalhes na seção "Verificação em aparelho" do README do repositório).
 
 ### Camadas
 

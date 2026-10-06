@@ -26,7 +26,7 @@ import platform.Security.SecItemCopyMatching
 import platform.Security.SecItemDelete
 import platform.Security.errSecSuccess
 import platform.Security.kSecAttrAccessible
-import platform.Security.kSecAttrAccessibleAfterFirstUnlock
+import platform.Security.kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
 import platform.Security.kSecAttrAccount
 import platform.Security.kSecAttrService
 import platform.Security.kSecClass
@@ -38,7 +38,8 @@ import platform.Security.kSecValueData
 
 /**
  * Token no Keychain do iOS (item genérico, service `br.com.pompeo.casa`, account `gdi-token`),
- * acessível depois do primeiro desbloqueio. Bindings platform.* já vêm no Kotlin/Native: sem .def de cinterop.
+ * acessível depois do primeiro desbloqueio e só neste aparelho: não migra por backup criptografado
+ * (simétrico ao allowBackup=false do Android). Bindings platform.* já vêm no Kotlin/Native: sem .def de cinterop.
  * Defensivo: qualquer status diferente de errSecSuccess na leitura vira "sem token".
  */
 @OptIn(ExperimentalForeignApi::class, BetaInteropApi::class)
@@ -79,7 +80,8 @@ class KeychainTokenStorage : TokenStorage {
             CFDictionaryAddValue(attributes, kSecAttrService, service)
             CFDictionaryAddValue(attributes, kSecAttrAccount, account)
             CFDictionaryAddValue(attributes, kSecValueData, value)
-            CFDictionaryAddValue(attributes, kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlock)
+            // Item antigo (AfterFirstUnlock) ainda é lido: a busca não filtra acessibilidade; o delete() do início o troca.
+            CFDictionaryAddValue(attributes, kSecAttrAccessible, kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly)
             // Falha é relatada ao TokenRepositoryImpl (sessão só em memória); o OSStatus vai na mensagem, nunca o token.
             val status = SecItemAdd(attributes, null)
             if (status != errSecSuccess) throw IllegalStateException("Keychain recusou a gravação (OSStatus $status)")

@@ -67,12 +67,16 @@ kotlin {
 }
 
 // Lê o token GDI de local.properties (ignorado pelo Git) e gera GdiBuildConfig em commonMain.
-// O valor só pré-preenche a tela de token (desenvolvimento), nunca é login automático; para gerar
-// um binário sem ele: ./gradlew ... -PgdiDevToken=false. Em produção o token ficaria num backend.
+// O valor só pré-preenche a tela de token (desenvolvimento), nunca é login automático, e só entra em
+// build não release; -PgdiDevToken=true|false força. Em produção o token ficaria num backend.
 val gdiConfig = tasks.register("generateGdiConfig") {
     val props = Properties()
     rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { props.load(it) }
-    val devToken = (project.findProperty("gdiDevToken")?.toString() ?: "true") != "false"
+    // Release = task pedida (assembleRelease, bundleRelease, linkReleaseFramework…) ou Xcode em Release
+    // (CONFIGURATION chega ao embedAndSignAppleFrameworkForXcode). Os dois são entradas do configuration cache.
+    val releaseBuild = gradle.startParameter.taskNames.any { it.contains("Release", ignoreCase = true) } ||
+        providers.environmentVariable("CONFIGURATION").orNull == "Release"
+    val devToken = project.findProperty("gdiDevToken")?.toString()?.let { it != "false" } ?: !releaseBuild
     val token = if (devToken) props.getProperty("gdi.token", "") else ""
     val baseUrl = props.getProperty("gdi.baseUrl", "https://api-casainteligente.intelbras.com.br")
     val outDir = layout.buildDirectory.dir("generated/gdi/commonMain/kotlin")

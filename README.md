@@ -205,7 +205,7 @@ grep -n "^import br\.com\.pompeo\.casa\." "$SRC/ui/HomeViewModel.kt" | grep -v "
 
 ## Verificação em aparelho
 
-**Estado: executado em 05/10/2026 no Moto G9 Play (Android 11) com a API real e a conta de teste; no iOS, parcialmente** (iPhone 13 Pro físico: build assinado instalado e aberto com o token pré-preenchido; os fluxos 4, 9 e 17 foram conferidos no simulador iPhone 17 com a API real). O token vencido real (linha 2) foi conferido no iPhone físico em 06/10/2026. A linha 8 ainda depende do modo avião no aparelho; foi conferida só no simulador, contra um servidor local que imita o contrato da seção "Contrato real × Swagger". Nenhum comando de fechadura ou de volume foi confirmado.
+**Estado: executado em 05/10/2026 no Moto G9 Play (Android 11) com a API real e a conta de teste; no iOS, parcialmente** (iPhone 13 Pro físico em 06/10/2026: token vencido real, Home e vídeo ao vivo com a API real; fechadura e hub conferidos só no simulador iPhone 17 com a API real). A linha 8 ainda depende do modo avião no aparelho; foi conferida só no simulador, contra um servidor local que imita o contrato da seção "Contrato real × Swagger". Nenhum comando de fechadura ou de volume foi confirmado.
 
 Preparação: apagar os dados do app (`adb shell pm clear br.com.pompeo.casa`; no iPhone, apagar e reinstalar), gerar um token novo no portal e colocá-lo em `local.properties` ou colá-lo na tela. Comandos de fechadura e de volume só são confirmados com autorização explícita do dono da conta.
 
@@ -229,7 +229,7 @@ Preparação: apagar os dados do app (`adb shell pm clear br.com.pompeo.casa`; n
 | 16 | RF09 | Histórico | Eventos "Remoto (APP)"/"Por dentro (manual)" com data e hora; "Ver mais" se houver 10 | 05/10 23:37 | Moto G9 Play | OK: 10 eventos reais "Remoto (APP)" com data e hora |
 | 17 | — | Hub MCA 1002 | Online, faixa da semana com hoje em verde, 1 subdispositivo, "Firmware 2.4.628243" com "Atualizado" | 05/10 23:37 | Moto G9 Play; simulador iOS | OK: Online, faixa da semana com hoje em verde, 1 subdispositivo, "Firmware 2.4.628243" "Atualizado" (igual a `app-18`) |
 | 18 | — | Definições → Sair | Volta à tela de token; o "voltar" do sistema não retorna à Home | 05/10 23:56 | Moto G9 Play | OK: voltou ao token; o "voltar" saiu do app; reabrir pediu o token de novo |
-| 19 | — | Repetir 4, 9, 13 e 17 no iPhone | Mesmo comportamento; vídeo via VLCKit (1.º quadro a frio pode passar de 30 s) | 05/10 23:58 | iPhone 13 Pro; simulador iOS | Parcial: no iPhone físico, build assinado instalado e aberto com o token pré-preenchido; 4, 9 e 17 conferidos no simulador. Repetir 4, 9, 13 e 17 no iPhone físico |
+| 19 | — | Repetir 4, 9, 13 e 17 no iPhone | Mesmo comportamento; vídeo via VLCKit (1.º quadro a frio pode passar de 30 s) | 06/10 12:43 | iPhone 13 Pro; simulador iOS | Parcial. No iPhone físico: 4 OK (iM4 Dual com badge 2, MFR 2030 via hub, MCA 1002; banner e nomes inteiros na tela de 390 pt) e 9 OK ("AO VIVO", "1º quadro em 39,2 s" a frio via VLCKit; o relógio da câmera avançava, e o Moto G9 mostrou a mesma cena no mesmo momento). 13 e 17 conferidos só no simulador; falta repeti-los no iPhone físico |
 
 Passo final: capturar cada tela no Android (`adb exec-out screencap -p > tela-<nome>.png`) e no iPhone e comparar lado a lado com as capturas de referência do Mibo Smart. Só são aceitas diferenças de recurso que a GDI não oferece ou de conteúdo de outra conta. Depois, salvar as telas finais em `docs/telas/` (`adb exec-out screencap -p > docs/telas/android-<tela>.png`; no iPhone, botões laterais, salvando como `docs/telas/ios-<tela>.png`) e referenciá-las neste README.
 
@@ -255,7 +255,7 @@ Quem tem câmeras, fechadura e hub Intelbras quer, num só app, ver a câmera ao
 | RF08 | Itens por página 2/5/10/50, "Carregar mais", "Sem mais informações", contagem; erro ao carregar mais mantém a lista | Feito |
 | RF09 | Histórico com 10 eventos, "Ver mais" com 30; vazio e erro com textos diferentes | Feito |
 
-O roteiro de 19 passos (RF01–RF09) foi executado no Android físico com a API real em 05/10/2026, com comparação lado a lado com as capturas de referência; no iOS, o build assinado roda no iPhone e os fluxos principais foram conferidos no simulador com a API real. Pendentes: modo avião no aparelho e a repetição completa no iPhone físico (detalhes na seção "Verificação em aparelho" do README do repositório).
+O roteiro de 19 passos (RF01–RF09) foi executado no Android físico com a API real em 05/10/2026, com comparação lado a lado com as capturas de referência; no iPhone físico, token vencido, Home e vídeo ao vivo foram conferidos com a API real em 06/10/2026 (fechadura e hub, só no simulador). Pendentes: modo avião no aparelho e fechadura e hub no iPhone físico (detalhes na seção "Verificação em aparelho" do README do repositório).
 
 ### Camadas
 
@@ -336,6 +336,7 @@ Medido na conta de teste entre 02 e 05/10/2026; onde diverge do Swagger, vale o 
 | 1.º quadro a frio, Android | ~21 s (proxy da nuvem; igual em qualquer cliente) |
 | 1.º quadro a frio, iOS | 37,8 s (uma única medição, VLCKit por software) |
 | Com este app no Moto G9 Play (05/10/2026) | 22,6 s a frio; 3,6 s a quente; 2,3 s ao trocar de lente |
+| Com este app no iPhone 13 Pro (06/10/2026) | 39,2 s a frio (VLCKit por software) |
 | Com este app no simulador iOS (05/10/2026) | 2,4 s com o proxy já aquecido |
 | APK debug com 3 ABIs | ~165 MB (libVLC) |
 

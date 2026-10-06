@@ -17,6 +17,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.flow.first
 import org.videolan.libvlc.LibVLC
@@ -37,6 +39,9 @@ actual fun CameraPlayer(url: String, muted: Boolean, modifier: Modifier, onProgr
     val player = remember(libVlc) { MediaPlayer(libVlc) }
     // Depois do 1.º quadro, rebuffering do libVLC (reset de PCR) não pode desligar o AO VIVO (igual ao iOS).
     val firstFrameShown = remember(player) { AtomicBoolean(false) }
+    // stop()/release()/setMedia() do libVLC são síncronos e, com a leitura RTSP travada, esperam o timeout:
+    // na main thread isso deu ANR. Uma thread única tira essas chamadas da main e preserva a ordem stop → (re)play.
+    val vlcControl = remember(player) { Executors.newSingleThreadExecutor { r -> Thread(r, "vlc-control") } }
     DisposableEffect(player) {
         // Eventos do libVLC viram a porcentagem da tela (30–100 %).
         player.setEventListener { event ->
@@ -59,14 +64,13 @@ actual fun CameraPlayer(url: String, muted: Boolean, modifier: Modifier, onProgr
         }
         onDispose {
             player.setEventListener(null) // nada chega a uma composição morta
-            // detachViews mexe em View: main thread. stop()/release() são síncronos e, com a leitura RTSP
-            // travada, esperam o timeout: na main thread isso deu ANR. Em outra thread, não.
-            player.detachViews()
-            Thread({
+            player.detachViews() // mexe em View: main thread
+            vlcControl.post {
                 player.stop()
                 player.release()
                 libVlc.release()
-            }, "vlc-release").start()
+            }
+            vlcControl.shutdown() // a fila ainda termina: um stop() pendente roda antes do release()
         }
     }
 
@@ -76,19 +80,22 @@ actual fun CameraPlayer(url: String, muted: Boolean, modifier: Modifier, onProgr
         snapshotFlow { layoutReady }.first { it }
         firstFrameShown.set(false) // nova conexão: o próximo Vout religa o AO VIVO
         currentOnProgress(PlayerProgress(32, "Iniciando player"))
-        val media = Media(libVlc, Uri.parse(url)).apply {
-            // Sem "fmtp" no SDP o decoder de HARDWARE não conhece a resolução e falha ("Set Resolution failed");
-            // o de software lê VPS/SPS/PPS do próprio fluxo. (enabled = false, force = false)
-            setHWDecoderEnabled(false, false)
-            // O áudio AAC também vem sem "config" no SDP e decodifica como ruído: desativado.
-            addOption(":no-audio")
-            addOption(":network-caching=$LIVE_NETWORK_CACHING_MS") // opção por mídia usa ":"; global usa "--"
+        // A Media nasce dentro da tarefa: se ela não rodar (shutdown), nada nativo fica sem release.
+        vlcControl.post {
+            val media = Media(libVlc, Uri.parse(url)).apply {
+                // Sem "fmtp" no SDP o decoder de HARDWARE não conhece a resolução e falha ("Set Resolution failed");
+                // o de software lê VPS/SPS/PPS do próprio fluxo. (enabled = false, force = false)
+                setHWDecoderEnabled(false, false)
+                // O áudio AAC também vem sem "config" no SDP e decodifica como ruído: desativado.
+                addOption(":no-audio")
+                addOption(":network-caching=$LIVE_NETWORK_CACHING_MS") // opção por mídia usa ":"; global usa "--"
+            }
+            player.media = media
+            media.release() // Media é nativo com contagem de referência; o player guarda a sua
+            player.play()
         }
-        player.media = media
-        media.release() // Media é nativo com contagem de referência; o player guarda a sua
-        player.play()
     }
-    LaunchedEffect(player, muted) { player.volume = if (muted) 0 else 100 }
+    LaunchedEffect(player, muted) { vlcControl.post { player.volume = if (muted) 0 else 100 } }
 
     // Ao vivo não "pausa": em background para o stream e reconecta ao voltar (poupa banda e cota).
     val owner = LocalLifecycleOwner.current
@@ -98,7 +105,7 @@ actual fun CameraPlayer(url: String, muted: Boolean, modifier: Modifier, onProgr
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_STOP -> {
-                    player.stop()
+                    vlcControl.post { player.stop() }
                     stoppedInBackground = true
                 }
                 Lifecycle.Event.ON_START -> if (stoppedInBackground) {
@@ -117,4 +124,12 @@ actual fun CameraPlayer(url: String, muted: Boolean, modifier: Modifier, onProgr
         factory = { ctx -> VLCVideoLayout(ctx).also { player.attachViews(it, null, false, false); layoutReady = true } },
         modifier = modifier,
     )
+}
+
+/**
+ * Depois do shutdown (onDispose), execute lançaria RejectedExecutionException: a tarefa é descartada.
+ * Quem posta (efeitos, observer do ciclo de vida, onDispose) roda na main: sem corrida entre teste e execute.
+ */
+private fun ExecutorService.post(task: Runnable) {
+    if (!isShutdown) execute(task)
 }

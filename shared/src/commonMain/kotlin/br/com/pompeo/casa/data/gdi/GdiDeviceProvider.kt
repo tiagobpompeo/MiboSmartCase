@@ -27,11 +27,14 @@ class GdiDeviceProvider(private val api: GdiApi) : DeviceProvider {
         return DevicePage(GdiDeviceParser.parse(json), page = query.page, pageSize = query.pageSize)
     }
 
-    /** [channel] vira canalVideo; online e vídeo usam o ns puro. */
+    /** [channel] vira canalVideo; o vídeo usa o ns puro. */
     override suspend fun startLive(camera: Device, channel: Int): StreamSession = api.createVideoStream(camera.ns, channel = channel)
     override suspend fun stopLive(session: StreamSession) = api.endSession(session.sessionId)
     override suspend fun firmware(device: Device): Firmware = api.firmware(device.gdiApiNs)
-    override suspend fun isOnline(device: Device): Boolean? = api.isOnline(device.ns)
+
+    // Medido em 05/10/2026: para a fechadura Zigbee, /produtos/online/v1 com o ns puro responde online=false mesmo
+    // com a listagem dizendo "online"; com o ns composto responde true. Câmera e hub: gdiApiNs já é o ns puro.
+    override suspend fun isOnline(device: Device): Boolean? = api.isOnline(device.gdiApiNs)
     override val locks: LockController = GdiLockController(api)
 }
 

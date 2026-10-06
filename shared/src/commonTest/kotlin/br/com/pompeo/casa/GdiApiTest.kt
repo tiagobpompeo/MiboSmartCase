@@ -379,6 +379,27 @@ class GdiApiTest {
     }
 
     @Test
+    fun onlineUsesCompositeNsOnlyForSubdevices() = runTest {
+        // Arrange: como a GDI real, o ns puro da fechadura Zigbee responde online=false.
+        val bodies = mutableListOf<String>()
+        val provider = GdiDeviceProvider(
+            api(tokens(TOKEN)) { request, _ ->
+                val body = request.bodyText
+                bodies += body
+                HttpStatusCode.OK to if (""""ns":"LOCK1"""" in body) ONLINE_FALSE else ONLINE_TRUE
+            },
+        )
+        // Act
+        val lockOnline = provider.isOnline(lock)
+        val cameraOnline = provider.isOnline(camera)
+        // Assert
+        assertEquals(true, lockOnline, "subdispositivo consulta com o ns composto")
+        assertEquals(true, cameraOnline)
+        assertTrue(""""ns":"$LOCK_API_NS"""" in bodies[0], bodies[0])
+        assertTrue(""""ns":"CAM1"""" in bodies[1], bodies[1])
+    }
+
+    @Test
     fun acceptsRealRtspOnlyStreamResponse() = runTest {
         // Arrange
         var requests = 0
@@ -478,6 +499,7 @@ class GdiApiTest {
         const val RENEW_REFUSED = """{"status":"erro","msg":"Não foi possível renovar o token, por favor gere um novo"}"""
         const val RENEWED = """{"status":"sucesso","data":{"token":"$NEW_TOKEN"}}"""
         const val ONLINE_TRUE = """{"status":"sucesso","data":{"online":true}}"""
+        const val ONLINE_FALSE = """{"status":"sucesso","data":{"online":false}}"""
         const val EMPTY_LIST = """{"status":"sucesso","data":[]}"""
         const val COMMAND_OK = """{"status":"sucesso"}"""
         const val VOLUME_UNKNOWN_ERROR = """{"msg":"Erro desconhecido, por favor tente novamente mais tarde"}"""

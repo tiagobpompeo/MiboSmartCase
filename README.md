@@ -209,7 +209,7 @@ grep -rl "br.com.pompeo.casa.feature" --include="*.kt" --include="*.java" core a
 
 ## Verificação em aparelho
 
-**Estado: executado em 05 e 06/10/2026 no Moto G9 Play (Android 11) e no iPhone 13 Pro com a API real e a conta de teste** (iPhone 13 Pro físico em 06/10/2026, com a API real: token vencido, Home, vídeo ao vivo, fechadura e hub). Na linha 8, o caso (a), sem rede, foi conferido no iPhone físico; o caso (b), erro ao carregar mais, só contra um servidor local que imita o contrato da seção "Contrato real × Swagger". Nenhum comando de fechadura ou de volume foi confirmado.
+**Estado: executado em 05 e 06/10/2026 no Moto G9 Play (Android 11) e no iPhone 13 Pro com a API real e a conta de teste** e repetido em 14/10/2026 com o app modular nos dois aparelhos (linha 20) (iPhone 13 Pro físico em 06/10/2026, com a API real: token vencido, Home, vídeo ao vivo, fechadura e hub). Na linha 8, o caso (a), sem rede, foi conferido no iPhone físico; o caso (b), erro ao carregar mais, só contra um servidor local que imita o contrato da seção "Contrato real × Swagger". Nenhum comando de fechadura ou de volume foi confirmado.
 
 Preparação: apagar os dados do app (`adb shell pm clear br.com.pompeo.casa`; no iPhone, apagar e reinstalar), gerar um token novo no portal e colocá-lo em `local.properties` ou colá-lo na tela. Comandos de fechadura e de volume só são confirmados com autorização explícita do dono da conta.
 
@@ -234,6 +234,7 @@ Preparação: apagar os dados do app (`adb shell pm clear br.com.pompeo.casa`; n
 | 17 | — | Hub MCA 1002 | Online, faixa da semana com hoje em verde, 1 subdispositivo, "Firmware 2.4.628243" com "Atualizado" | 05/10 23:37 | Moto G9 Play; simulador iOS | OK: Online, faixa da semana com hoje em verde, 1 subdispositivo, "Firmware 2.4.628243" "Atualizado" (igual a `app-18`) |
 | 18 | — | Definições → Sair | Volta à tela de token; o "voltar" do sistema não retorna à Home | 05/10 23:56 | Moto G9 Play | OK: voltou ao token; o "voltar" saiu do app; reabrir pediu o token de novo |
 | 19 | — | Repetir 4, 9, 13 e 17 no iPhone | Mesmo comportamento; vídeo via VLCKit (1.º quadro a frio pode passar de 30 s) | 06/10 12:53 | iPhone 13 Pro | OK no iPhone físico. 4: iM4 Dual (badge 2), MFR 2030 (via hub), MCA 1002; banner e nomes inteiros na tela de 390 pt. 9: "AO VIVO", "1º quadro em 39,2 s" a frio via VLCKit (o relógio da câmera avançava, e o Moto G9 mostrou a mesma cena no mesmo momento). 13: bateria 26 %, Online, "Porta aberta", volume com o HTTP 500 real e níveis habilitados (não tocados). 17: Online, faixa da semana com hoje em verde, 1 subdispositivo, "Firmware 2.4.628243" "Atualizado" |
+| 20 | — | Repetir 4, 9, 13, 16 e 17 com o app modular (seção "Modularização") | Mesmo comportamento do app de um módulo só | 14/10 | Moto G9 Play; iPhone 13 Pro | OK. Moto: token novo → Home com iM4 Dual, MFR 2030 (via hub) e MCA 1002; MFR 2030 "Porta fechada", bateria 25 %, Online, histórico; MCA 1002 Online, "Firmware 2.4.628243"; iM4 Dual "AO VIVO", "1º quadro em 81,1 s" a frio; nenhum crash no logcat. iPhone: Home e iM4 Dual "AO VIVO", "1º quadro em 42,7 s", depois de trocar o token na tela. Nenhum comando de fechadura ou de volume enviado |
 
 Passo final: capturar cada tela no Android (`adb exec-out screencap -p > tela-<nome>.png`) e no iPhone e comparar lado a lado com as capturas de referência do Mibo Smart. Só são aceitas diferenças de recurso que a GDI não oferece ou de conteúdo de outra conta. Depois, salvar as telas finais em `docs/telas/` (`adb exec-out screencap -p > docs/telas/android-<tela>.png`; no iPhone, botões laterais, salvando como `docs/telas/ios-<tela>.png`) e referenciá-las neste README.
 
@@ -300,6 +301,8 @@ Só `core/data/gdi` conhece a GDI (rotas, nomes de campo, códigos de erro, form
 ### Modularização
 
 O app é dividido em módulos Gradle no padrão usado hoje no mercado (o mesmo do [Now in Android](https://github.com/android/nowinandroid), adaptado a KMP com o módulo umbrella que a JetBrains recomenda para o framework do iOS): **`core/*`** sem tela, **`feature/*`** com uma tela ou fluxo cada, **`shared`** como umbrella, e **plugins de convenção** num build incluído (`build-logic/`) para a configuração não se repetir.
+
+O detalhe módulo a módulo (arquivos, de onde cada um veio, API pública, dependências e testes) está em [docs/modularizacao.md](docs/modularizacao.md).
 
 | Módulo | Conteúdo | Depende de |
 |---|---|---|

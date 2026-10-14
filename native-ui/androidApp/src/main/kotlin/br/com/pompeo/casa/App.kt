@@ -1,0 +1,82 @@
+package br.com.pompeo.casa
+
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
+import br.com.pompeo.casa.ui.CameraScreen
+import br.com.pompeo.casa.ui.DeviceScreen
+import br.com.pompeo.casa.ui.HomeShell
+import br.com.pompeo.casa.ui.HomeViewModel
+import br.com.pompeo.casa.ui.MiboColors
+import br.com.pompeo.casa.ui.TokenScreen
+import br.com.pompeo.casa.ui.TokenValidation
+import kotlinx.serialization.Serializable
+// Mudou no porte: era org.koin.compose.viewmodel.koinViewModel (Koin multiplataforma); aqui é o do Koin AndroidX.
+import org.koin.androidx.compose.koinViewModel
+
+// Rotas tipadas (Navigation Compose da AndroidX + kotlinx.serialization; mesmos pacotes da versão multiplataforma). Argumentos pequenos: a tela
+// busca o objeto no StateFlow do ViewModel pelo ns.
+@Serializable object TokenRoute
+@Serializable object HomeRoute
+@Serializable data class CameraRoute(val ns: String)
+@Serializable data class DeviceRoute(val ns: String)
+
+/**
+ * Raiz da UI do app Android. Mudou no porte: na raiz esta árvore era compartilhada (a mesma rodava no Android e
+ * no iOS); aqui é só Android, em Jetpack Compose da AndroidX. O código das telas é o mesmo.
+ */
+@Composable
+fun App() {
+    MaterialTheme(
+        colorScheme = lightColorScheme(
+            primary = MiboColors.Green, onPrimary = Color.White,
+            background = MiboColors.PageBg, surface = MiboColors.Card,
+            onBackground = MiboColors.TextPrimary, onSurface = MiboColors.TextPrimary,
+            secondary = MiboColors.GreenNav,
+            // Diálogos e menus brancos como os cartões, em vez do cinza-lilás padrão do Material 3.
+            surfaceContainerHigh = MiboColors.Card, surfaceContainer = MiboColors.Card,
+            outline = MiboColors.Divider,
+        )
+    ) {
+        // Fora do NavHost: o dono é o ViewModelStoreOwner do host (a Activity).
+        val vm = koinViewModel<HomeViewModel>()
+        val nav = rememberNavController()
+        // Decidido UMA vez (senão o NavHost trocaria de destino a cada recomposição). Validação em andamento
+        // (token só na sessão) volta para a tela de token, que mostra o progresso.
+        val start: Any = remember { if (vm.token.value != null && vm.tokenValidation.value !is TokenValidation.Validating) HomeRoute else TokenRoute }
+        // Só desempilha se a entrada ainda é o topo: um 2.º toque em "voltar" durante a transição de saída
+        // (ou o onBack da armadilha 33) desempilharia a Home e deixaria o NavHost em branco (beco sem saída no iOS).
+        // Não use dropUnlessResumed: na transição de entrada a tela está só STARTED e o toque legítimo se perderia.
+        val popIfTop: (NavBackStackEntry) -> Unit = { entry -> if (nav.currentBackStackEntry?.id == entry.id) nav.popBackStack() }
+        Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            NavHost(nav, startDestination = start) {
+                composable<TokenRoute> {
+                    TokenScreen(vm, onConnected = { nav.navigate(HomeRoute) { popUpTo<TokenRoute> { inclusive = true } } })
+                }
+                composable<HomeRoute> {
+                    HomeShell(
+                        vm,
+                        onCamera = { nav.navigate(CameraRoute(it.ns)) },
+                        onDevice = { nav.navigate(DeviceRoute(it.ns)) },
+                        // Limpa a pilha inteira: Sair só existe na Home, que é a base da pilha (o login a substituiu).
+                        // Não use popUpTo(0): popUpTo(Int) não está na API comum do Navigation, e a sobrecarga comum
+                        // de rota-objeto trataria 0 como rota e lançaria por não achá-la no grafo.
+                        onLogout = { vm.logout(); nav.navigate(TokenRoute) { popUpTo<HomeRoute> { inclusive = true } } },
+                    )
+                }
+                composable<CameraRoute> { entry -> CameraScreen(vm, entry.toRoute<CameraRoute>().ns, onBack = { popIfTop(entry) }) }
+                composable<DeviceRoute> { entry -> DeviceScreen(vm, entry.toRoute<DeviceRoute>().ns, onBack = { popIfTop(entry) }) }
+            }
+        }
+    }
+}

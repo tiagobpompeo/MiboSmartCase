@@ -1,0 +1,1362 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+</head>
+<body>
+
+<title>Cola Casa Inteligente</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: coluna de leitura única (~760px) com navegação fixa no topo; cronômetro e roteiro primeiro, depois as paradas da fala. */
+:root {
+  --bg: #F3F6F2; --surface: #FFFFFF; --fg: #13201A; --muted: #56675D; --line: #D8E2DA;
+  --accent: #00813A; --accent-fill: #00A237; --accent-ink: #FFFFFF; --accent-soft: #E3F2E8;
+  --warn: #9A5B00; --warn-soft: #FBF0DD; --red: #C62828;
+  --font-display: "Bricolage Grotesque", "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1511; --surface: #16201A; --fg: #E4EDE7; --muted: #98A99F; --line: #28362E;
+    --accent: #45C97A; --accent-fill: #1E9E52; --accent-ink: #FFFFFF; --accent-soft: #163122;
+    --warn: #E5A84A; --warn-soft: #2E2414; --red: #FF6B6B; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1511; --surface: #16201A; --fg: #E4EDE7; --muted: #98A99F; --line: #28362E;
+  --accent: #45C97A; --accent-fill: #1E9E52; --accent-ink: #FFFFFF; --accent-soft: #163122;
+  --warn: #E5A84A; --warn-soft: #2E2414; --red: #FF6B6B; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 16px; line-height: 1.55; }
+.wrap { max-width: 760px; margin: 0 auto; padding-inline: 16px; padding-block: 0 64px; }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; line-height: 1.15; margin: 0; }
+h1 { font-size: clamp(1.9rem, 6vw, 2.6rem); font-weight: 700; letter-spacing: -0.01em; }
+h2 { font-size: 1.45rem; font-weight: 700; }
+h3 { font-size: 1.08rem; font-weight: 600; }
+p { margin: 0; }
+code, .mono { font-family: var(--font-mono); font-size: 0.86em; }
+code { background: var(--accent-soft); padding: 0.05em 0.35em; border-radius: 4px; overflow-wrap: anywhere; }
+a { color: var(--accent); }
+:focus-visible { outline: 3px solid var(--accent-fill); outline-offset: 2px; border-radius: 4px; }
+
+/* Navegação fixa */
+.nav { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); border-bottom: 1px solid var(--line); }
+.nav-inner { max-width: 760px; margin: 0 auto; padding-inline: 16px; padding-block: 8px; display: flex; gap: 8px; align-items: center; }
+.nav-links { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; flex: 1; min-width: 0; }
+.nav-links::-webkit-scrollbar { display: none; }
+.nav-links a { white-space: nowrap; text-decoration: none; color: var(--muted); font-size: 0.86rem; font-weight: 500; padding: 6px 10px; border-radius: 999px; }
+.nav-links a:hover { color: var(--fg); background: var(--accent-soft); }
+
+/* Cabeçalho */
+header.top { padding-block: 28px 8px; display: grid; gap: 10px; }
+.eyebrow { font-size: 0.78rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+.lede { color: var(--muted); max-width: 62ch; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.chip { font-size: 0.82rem; padding: 4px 10px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+
+.formula { margin-top: 18px; padding: 14px 16px; border-radius: var(--radius); background: var(--accent-soft); display: grid; gap: 6px; }
+.formula strong { color: var(--accent); font-family: var(--font-display); font-size: 1rem; }
+.formula ol { margin: 0; padding-left: 1.2em; display: grid; gap: 2px; }
+
+/* Ferramentas */
+.tools { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
+.tools input { flex: 1 1 220px; min-width: 0; font: inherit; padding: 10px 12px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--surface); color: var(--fg); }
+button { font: inherit; font-weight: 600; font-size: 0.9rem; cursor: pointer; border-radius: var(--radius); padding: 9px 14px; border: 1px solid var(--line); background: var(--surface); color: var(--fg); }
+button.primary { background: var(--accent-fill); border-color: var(--accent-fill); color: var(--accent-ink); }
+button:hover { border-color: var(--accent); }
+
+section { padding-top: 36px; display: grid; gap: 14px; scroll-margin-top: 64px; }
+.section-head { display: grid; gap: 4px; }
+.section-head p { color: var(--muted); }
+
+/* Roteiro com cronômetro */
+.timer { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: grid; gap: 12px; }
+.timer-row { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+.clock { font-family: var(--font-mono); font-size: 2.3rem; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.clock-sub { color: var(--muted); font-size: 0.88rem; }
+.timer-buttons { display: flex; gap: 8px; }
+.bar { height: 8px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.bar > span { display: block; height: 100%; width: 0; background: var(--accent-fill); transition: width .4s linear; }
+.blocks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.blocks li { display: grid; grid-template-columns: 6.6rem 1fr; gap: 10px; padding: 10px 12px; border-radius: 8px; border: 1px solid transparent; }
+.blocks li .t { font-family: var(--font-mono); font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; padding-top: 2px; }
+.blocks li .d { min-width: 0; }
+.blocks li .d b { display: block; }
+.blocks li .d span { color: var(--muted); font-size: 0.92rem; }
+.blocks li.now { background: var(--accent-soft); border-color: var(--accent); }
+.blocks li.done { opacity: 0.55; }
+.tip { font-size: 0.9rem; color: var(--warn); background: var(--warn-soft); padding: 8px 12px; border-radius: 8px; }
+
+/* Paradas da fala */
+.stop { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; display: grid; gap: 10px; scroll-margin-top: 64px; }
+.stop-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.stop-num { font-family: var(--font-mono); font-size: 0.82rem; font-weight: 600; color: var(--accent); }
+.label { font-size: 0.74rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+ul.say, ol.say { margin: 0; padding-left: 1.15em; display: grid; gap: 4px; }
+.qa { display: grid; gap: 6px; }
+details.q { border-top: 1px solid var(--line); padding-top: 8px; }
+details.q summary { cursor: pointer; font-weight: 600; list-style: none; display: flex; gap: 8px; align-items: baseline; }
+details.q summary::-webkit-details-marker { display: none; }
+details.q summary::before { content: "+"; font-family: var(--font-mono); color: var(--accent); width: 1ch; flex: none; }
+details.q[open] summary::before { content: "−"; }
+details.q .a { padding: 6px 0 4px 1.6ch; color: var(--fg); display: grid; gap: 6px; }
+details.q .a ul { margin: 0; padding-left: 1.1em; display: grid; gap: 2px; }
+.say-it { border-left: 3px solid var(--accent-fill); padding: 4px 0 4px 12px; font-style: italic; color: var(--fg); }
+
+/* Listas e tabelas */
+.top10 { margin: 0; padding-left: 1.4em; display: grid; gap: 10px; }
+.top10 li a { color: var(--fg); text-decoration: none; }
+.top10 li a:hover { color: var(--accent); }
+.kw { display: block; color: var(--red); font-weight: 600; font-size: 0.95rem; }
+details.q summary .qtext { display: block; min-width: 0; }
+details.q summary .qtext .kw { font-family: var(--font-body); margin-top: 2px; }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 0.93rem; }
+th, td { text-align: left; vertical-align: top; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+th { font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+tr:last-child td { border-bottom: none; }
+td:first-child { font-weight: 600; white-space: nowrap; }
+pre.tree { margin: 0; overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; font-family: var(--font-mono); font-size: 0.78rem; line-height: 1.5; }
+details.group { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; }
+details.group > summary { cursor: pointer; font-family: var(--font-display); font-weight: 600; }
+dl.terms { margin: 10px 0 2px; display: grid; gap: 8px; }
+dl.terms > div { display: grid; grid-template-columns: 7.5rem 1fr; gap: 10px; }
+dl.terms dt { font-family: var(--font-mono); font-weight: 600; font-size: 0.86rem; color: var(--accent); overflow-wrap: anywhere; }
+dl.terms dd { margin: 0; min-width: 0; }
+.checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.checklist label { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; }
+.checklist input { margin-top: 4px; accent-color: var(--accent-fill); width: 18px; height: 18px; flex: none; }
+.checklist label:has(input:checked) span { color: var(--muted); text-decoration: line-through; }
+.note { font-size: 0.9rem; color: var(--muted); }
+.empty-search { color: var(--muted); font-style: italic; }
+.flow { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.flow-col { display: grid; align-content: start; min-width: 0; }
+.flow-head { font-size: 0.74rem; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; color: var(--accent); }
+.flow-col.alt .flow-head { color: var(--warn); }
+.step { background: var(--accent-soft); border-radius: 8px; padding: 8px 12px; display: grid; gap: 2px; min-width: 0; }
+.flow-col.alt .step { background: var(--warn-soft); }
+.step strong { font-family: var(--font-display); font-size: 0.95rem; font-weight: 600; }
+.step span { color: var(--muted); font-size: 0.85rem; overflow-wrap: anywhere; }
+.step-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.down { text-align: center; color: var(--muted); font-size: 0.9rem; line-height: 1.5; }
+.join { border: 1px dashed var(--accent); border-radius: 8px; padding: 10px 12px; text-align: center; display: grid; gap: 2px; }
+.join span { color: var(--muted); font-size: 0.85rem; overflow-wrap: anywhere; }
+@media (max-width: 640px) { .flow { grid-template-columns: 1fr; } }
+@media (max-width: 520px) {
+  .blocks li { grid-template-columns: 1fr; gap: 2px; }
+  dl.terms > div { grid-template-columns: 1fr; gap: 0; }
+  .clock { font-size: 2rem; }
+}
+@media (prefers-reduced-motion: reduce) { .bar > span { transition: none; } }
+</style>
+
+<nav class="nav" aria-label="Seções">
+  <div class="nav-inner">
+    <div class="nav-links">
+      <a href="#roteiro">Roteiro</a>
+      <a href="#paradas">Fala</a>
+      <a href="#provaveis">Top 10</a>
+      <a href="#caminhos">Caminhos</a>
+      <a href="#endpoints">Endpoints</a>
+      <a href="#abordagens">2 abordagens</a>
+      <a href="#compose">Compose</a>
+      <a href="#extras">AWS e vídeo</a>
+      <a href="#kotlin">Kotlin</a>
+      <a href="#kmp">KMP</a>
+      <a href="#siglas">Siglas</a>
+      <a href="#checklist">Checklist</a>
+    </div>
+  </div>
+</nav>
+
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow">Case Intelbras · Casa Inteligente (API GDI)</div>
+    <h1>Cola da entrevista</h1>
+    <p class="lede">20 minutos de apresentação (produto, arquitetura e código) e 20 minutos de perguntas técnicas. As perguntas ficam fechadas: tente responder antes de abrir.</p>
+    <div class="chips">
+      <span class="chip">RF01–RF09 feitos</span>
+      <span class="chip">Android + iOS</span>
+      <span class="chip">91 testes Kotlin + 4 em Java</span>
+      <span class="chip">Moto G9 + iPhone 13 Pro, API real</span>
+      <span class="chip">1º quadro: 22,6 s frio · 3,6 s quente (Android) · 39,2 s frio (iPhone)</span>
+    </div>
+    <div class="formula">
+      <strong>Fórmula de cada resposta</strong>
+      <ol>
+        <li>Uma frase direta com a resposta.</li>
+        <li>Como fiz: a classe ou o mecanismo.</li>
+        <li>A prova: um teste ou o que vi no aparelho.</li>
+        <li>O trade-off: o limite conhecido ou o que faria diferente.</li>
+      </ol>
+      <p class="note">Não sabe? Diga o que sabe e como descobriria. Nunca invente.</p>
+    </div>
+    <div class="tools">
+      <input id="busca" type="search" placeholder="Buscar (ex.: VLC, Mutex, Keystore, 401)" aria-label="Buscar na cola" autocomplete="off">
+      <button id="abrir" type="button">Abrir todas as respostas</button>
+    </div>
+    <p id="sem-resultado" class="empty-search" hidden>Nada encontrado para essa busca.</p>
+  </header>
+
+  <!-- ROTEIRO -->
+  <section id="roteiro">
+    <div class="section-head">
+      <h2>Roteiro dos 20 minutos</h2>
+      <p>Inicie o cronômetro ao começar. O bloco atual fica destacado.</p>
+    </div>
+    <div class="timer">
+      <div class="timer-row">
+        <div>
+          <div class="clock" id="clock">20:00</div>
+          <div class="clock-sub" id="clock-sub">Pronto para começar</div>
+        </div>
+        <div class="timer-buttons">
+          <button id="start" class="primary" type="button">Iniciar</button>
+          <button id="reset" type="button">Zerar</button>
+        </div>
+      </div>
+      <div class="bar" aria-hidden="true"><span id="bar"></span></div>
+      <ol class="blocks" id="blocks">
+        <li data-from="0" data-to="90"><span class="t">0:00–1:30</span><span class="d"><b>Abertura</b><span>O problema, o que entreguei, os números e o roteiro da fala.</span></span></li>
+        <li data-from="90" data-to="420"><span class="t">1:30–7:00</span><span class="d"><b>Demonstração ao vivo</b><span>Token → Home (filtro, 2 por página, "Carregar mais") → câmera ao vivo → fechadura (estado, volume com o 500, histórico, segurar e confirmar) → hub.</span></span></li>
+        <li data-from="420" data-to="660"><span class="t">7:00–11:00</span><span class="d"><b>Arquitetura</b><span>Camadas, comum × nativo (expect/actual e Swift), DeviceProvider, Koin, os dois casos de uso.</span></span></li>
+        <li data-from="660" data-to="1020"><span class="t">11:00–17:00</span><span class="d"><b>Código</b><span>SubmitTokenUseCase · GdiApi · DeviceRepositoryImpl · CameraPlayer + VLCVideoPlayer.swift · teste parallelExpiredCallsRenewTheTokenOnlyOnce.</span></span></li>
+        <li data-from="1020" data-to="1140"><span class="t">17:00–19:00</span><span class="d"><b>Processo e qualidade</b><span>Especificação antes do código, validação, e duas histórias: fechadura "Offline" e layout no iPhone.</span></span></li>
+        <li data-from="1140" data-to="1200"><span class="t">19:00–20:00</span><span class="d"><b>Fechamento</b><span>Limitações honestas e próximos passos, deixando ganchos para as perguntas.</span></span></li>
+      </ol>
+      <p class="tip">Se a demonstração atrasar, corte o código, não a arquitetura. O código volta nas perguntas.</p>
+    </div>
+  </section>
+
+  <!-- PARADAS -->
+  <section id="paradas">
+    <div class="section-head">
+      <h2>A fala, parada por parada</h2>
+      <p>Em cada parada: o que falar e o que podem perguntar ali.</p>
+    </div>
+
+    <article class="stop searchable" id="p0">
+      <div class="stop-head"><span class="stop-num">00</span><h3>Abertura</h3></div>
+      <p class="say-it">"App Android e iOS em Kotlin Multiplatform com Compose Multiplatform: uma única base de regra, dados e telas. O nativo fica só onde precisa: o cofre do token e o player de vídeo. MVVM + Clean. RF01–RF09 feitos, 91 testes, e conferi tudo nos aparelhos reais com a API real."</p>
+    </article>
+
+    <article class="stop searchable" id="p1">
+      <div class="stop-head"><span class="stop-num">01</span><h3>Especificação e API real</h3></div>
+      <div class="label">Fale</div>
+      <ul class="say"><li>Antes de codar, medi a API real: ela diverge do Swagger.</li><li>Escrevi a especificação com marcos M1–M12, cada um com critério de pronto.</li></ul>
+      <div class="qa">
+        <details class="q"><summary>O que divergia do Swagger?</summary><div class="a"><ul>
+          <li>Todo JSON vem como <code>text/plain</code>, então leio o texto e faço o parse à mão.</li>
+          <li>HTTP 200 pode trazer <code>"status":"erro"</code>.</li>
+          <li>Vídeo é só uma URL RTSP, sem MP4 nem <code>session_id</code>.</li>
+          <li>Fechadura exige o <code>ns</code> composto.</li>
+          <li>Sem <code>origem</code> a listagem dá 500.</li></ul></div></details>
+        <details class="q"><summary>Por que medir antes?</summary><div class="a"><p>Codar em cima do Swagger daria erro em produção. O contrato medido virou fixture de teste.</p></div></details>
+      </div>
+    </article>
+
+    <article class="stop searchable" id="p2">
+      <div class="stop-head"><span class="stop-num">02</span><h3>Projeto KMP</h3></div>
+      <div class="label">Fale</div>
+      <ul class="say"><li>Um módulo <code>shared</code> + <code>androidApp</code> + <code>iosApp</code>.</li><li>Código em <code>commonMain</code>; nativo em <code>androidMain</code> e <code>iosMain</code>.</li><li>No iOS o Kotlin vira o framework estático <code>Shared</code>.</li></ul>
+      <div class="qa">
+        <details class="q"><summary>Por que KMP e não Flutter ou nativo puro?</summary><div class="a"><p>O case pontua Kotlin/KMP, e o KMP dá uma regra só nas duas plataformas sem abrir mão do nativo onde precisa.</p></div></details>
+        <details class="q"><summary>O que é expect/actual?</summary><div class="a"><p>Declaro no comum o que preciso; cada plataforma implementa. Usei no Koin de plataforma, na flag de debug, no calendário e no player de vídeo. <a href="#expect-actual">Os quatro, com as armadilhas</a>.</p></div></details>
+        <details class="q"><summary>Quais versões?</summary><div class="a"><p>Kotlin 2.4.20, Compose MP 1.12.1, AGP 9.1.1, Ktor 3.5.1, Koin 4.2.2, coroutines 1.11.0. minSdk 26, targetSdk 37, iOS 16.</p></div></details>
+      </div>
+    </article>
+
+    <article class="stop searchable" id="p3">
+      <div class="stop-head"><span class="stop-num">03</span><h3>Arquitetura</h3></div>
+      <div class="label">Fale</div>
+      <ul class="say"><li><code>ui</code> → <code>domain</code> ← <code>data</code>. Domínio em Kotlin puro.</li><li>O ViewModel só enxerga interfaces; o Koin liga interface → implementação.</li><li>Três <code>grep</code> conferem que nenhuma camada importa o que não deve.</li></ul>
+      <div class="qa">
+        <details class="q"><summary>Por que só dois casos de uso?</summary><div class="a"><p>Só onde há regra: validar o token antes de gravar (<code>SubmitTokenUseCase</code>) e gravar o volume e reler (<code>ChangeLockVolumeUseCase</code>). O resto só repassaria a chamada.</p></div></details>
+        <details class="q"><summary>Um ViewModel só?</summary><div class="a"><p>Uma fonte de verdade para o tamanho do case. Ao modularizar, cada feature ganha o seu.</p></div></details>
+        <details class="q"><summary>Koin ou Hilt?</summary><div class="a"><p>O Hilt só existe no Android; o Koin roda no código comum. <a href="#koin">Como a DI funciona e como entra uma tela nova</a>.</p></div></details>
+        <details class="q"><summary>Como entraria um segundo parceiro?</summary><div class="a"><ul>
+          <li>Nova implementação de <code>DeviceProvider</code> registrada no Koin; o repositório recebe todos com <code>getAll()</code> e roteia por <code>providerId</code>. UI e domínio não mudam.</li>
+          <li>Ajustaria: erro mapeado por parceiro, rotas por <code>providerId + ns</code>, credencial por parceiro, chamadas em paralelo com resultado parcial.</li></ul></div></details>
+        <details class="q"><summary>Por que não modularizou?</summary><div class="a"><p>Build simples para o tamanho do case. Plano: <code>:core:domain</code>, <code>:data:gdi</code> e <code>:feature:*</code>, e aí o próprio Gradle garante as fronteiras.</p></div></details>
+      </div>
+    </article>
+
+    <article class="stop searchable" id="p4">
+      <div class="stop-head"><span class="stop-num">04</span><h3>UI com Compose</h3></div>
+      <div class="label">Fale</div>
+      <ul class="say"><li>100% Compose, mesmas telas nas duas plataformas, visual do app Mibo Smart.</li><li>Cada tela trata carregando, conteúdo, vazio e erro.</li><li>Botão sem rota na API mostra aviso honesto ("Indisponível na API GDI").</li></ul>
+      <div class="qa">
+        <details class="q"><summary>Como a tela recebe o estado?</summary><div class="a"><p><code>StateFlow</code> no ViewModel coletado com <code>collectAsStateWithLifecycle</code>, que para de coletar quando a tela sai de cena.</p></div></details>
+        <details class="q"><summary>remember ou rememberSaveable?</summary><div class="a"><p><code>rememberSaveable</code> sobrevive à rotação (aba, grade/lista, lente). O campo do token usa <code>remember</code> de propósito, para o token não ir para o estado salvo do sistema.</p></div></details>
+        <details class="q"><summary>Efeitos colaterais?</summary><div class="a"><p><code>LaunchedEffect</code> para pedir a sessão de vídeo e ler a fechadura; <code>DisposableEffect</code> para liberar o player ao sair.</p></div></details>
+        <details class="q"><summary>Navegação?</summary><div class="a"><p>Rotas tipadas <code>@Serializable</code> no <code>NavHost</code> multiplataforma; o ViewModel não conhece o <code>NavController</code>.</p></div></details>
+        <details class="q"><summary>Algo deu errado na UI?</summary><div class="a"><p>No iPhone de 390 pt o banner quebrava as palavras. Criei o <code>FitText</code>, que reduz a fonte até caber.</p></div></details>
+        <details class="q"><summary>A lista é lazy?</summary><div class="a"><p>Não: poucos aparelhos e paginação de 5 em 5. Para muitos itens usaria <code>LazyVerticalGrid</code>.</p></div></details>
+      </div>
+    </article>
+
+    <article class="stop searchable" id="p5">
+      <div class="stop-head"><span class="stop-num">05</span><h3>Token (RF01) e segurança</h3></div>
+      <div class="label">Fale</div>
+      <ul class="say"><li>Botão só habilita com formato plausível (8+ caracteres, sem espaço).</li><li>Token em memória enquanto a 1ª página carrega; só se der certo gravo cifrado.</li><li>Erro ou cancelamento fazem logout.</li></ul>
+      <div class="qa">
+        <details class="q"><summary>Onde fica guardado?</summary><div class="a"><ul>
+          <li>Android: chave AES-256 no Keystore, AES-GCM, <code>iv:ciphertext</code> em SharedPreferences privadas, <code>allowBackup=false</code>.</li>
+          <li>iOS: Keychain com <code>ThisDeviceOnly</code>, via cinterop com <code>platform.Security</code>.</li></ul></div></details>
+        <details class="q"><summary>Por que não EncryptedSharedPreferences?</summary><div class="a"><p>A Google descontinuou a <code>security-crypto</code>. Keystore direto é o recomendado e não traz dependência.</p></div></details>
+        <details class="q"><summary>Como o token não vaza?</summary><div class="a"><p>Fora do Git; nenhum log nem plugin Logging do Ktor; mascarado na tela (<code>Ot_ab…wxyz</code>); o release não embute o token de desenvolvimento. Limite: <code>const val</code> é extraível, por isso só em demo.</p></div></details>
+        <details class="q"><summary>E se girar a tela validando?</summary><div class="a"><p>Continua: roda no <code>viewModelScope</code>. Se o ViewModel for destruído, o cancelamento faz logout e nenhum token não validado fica.</p></div></details>
+      </div>
+    </article>
+
+    <article class="stop searchable" id="p6">
+      <div class="stop-head"><span class="stop-num">06</span><h3>Listagem, filtro e paginação (RF02, RF07, RF08)</h3></div>
+      <div class="label">Fale</div>
+      <ul class="say"><li><code>POST</code> com <code>pagina</code>, <code>tamanhoPagina</code> e <code>origem</code>.</li><li>Sem total na API: "tem mais" = a página veio cheia.</li><li>Filtro no servidor; troca de filtro recomeça na página 1.</li></ul>
+      <div class="qa">
+        <details class="q"><summary>E se trocar o filtro rápido várias vezes?</summary><div class="a"><ul>
+          <li>Geração: a resposta velha nunca é publicada, mesmo sem ser cancelada.</li>
+          <li>Cancelamento dos jobs: não espera uma chamada lenta.</li>
+          <li><code>Mutex</code>: as escritas não se cruzam.</li>
+          <li>Prova: <code>staleFirstPageIsNotPublishedAfterOriginChanged</code>, com tempo virtual.</li></ul></div></details>
+        <details class="q"><summary>Como sabe o tipo do aparelho?</summary><div class="a"><p>A API não informa. Infiro pelo prefixo do modelo ou nome: <code>iM</code> câmera, <code>MFR</code> fechadura, <code>MCA</code>/<code>IOT-ZG</code> hub.</p></div></details>
+        <details class="q"><summary>Erro ao carregar mais?</summary><div class="a"><p>A lista fica; o erro aparece abaixo com "Tentar novamente".</p></div></details>
+      </div>
+    </article>
+
+    <article class="stop searchable" id="p7">
+      <div class="stop-head"><span class="stop-num">07</span><h3>Vídeo ao vivo (RF03)</h3></div>
+      <div class="label">Fale</div>
+      <ul class="say"><li>A API devolve só RTSP com H.265 sem <code>fmtp</code> no SDP.</li><li>libVLC no Android; VLCKit no iOS, em Swift, implementando uma interface Kotlin.</li><li>Progresso em %, "AO VIVO" e "1º quadro em X s".</li></ul>
+      <div class="qa">
+        <details class="q"><summary>Por que VLC e não Media3 / AVPlayer?</summary><div class="a"><p>O Media3 suporta RTSP mas recusa este SDP ("missing attribute fmtp"). O AVPlayer não toca RTSP nenhum.</p></div></details>
+        <details class="q"><summary>Por que decodificação por software?</summary><div class="a"><p>Sem <code>fmtp</code> o decoder de hardware não recebe a resolução; o de software lê os parâmetros de dentro do fluxo. Áudio desligado: o AAC vem sem config.</p></div></details>
+        <details class="q"><summary>Por que demora a frio?</summary><div class="a"><p>É o proxy da nuvem: 22,6 s (Android) e 39,2 s (iPhone) a frio; 3,6 s a quente. Buffer de 800 ms no Android: com 300 ms o Moto G9 atrasava quadros em espiral.</p></div></details>
+        <details class="q"><summary>Sair da tela e segundo plano?</summary><div class="a"><ul>
+          <li>Sair: <code>DisposableEffect</code> libera o player; a sessão é encerrada no <code>viewModelScope</code>.</li>
+          <li>Android: <code>ON_STOP</code> para, <code>ON_START</code> reconecta.</li>
+          <li>Chamadas bloqueantes do VLC numa única thread de controle: sem ANR.</li>
+          <li>Limite: no iOS o player só para quando a tela é descartada.</li></ul></div></details>
+        <details class="q"><summary><span class="qtext">Duas lentes?<span class="kw">Um fluxo por câmera (testado)</span></span></summary><div class="a">
+          <p>Envio o canal certo (<code>canalVideo</code> 0 ou 1), mas a API devolve o mesmo vídeo para os dois; o app avisa na tela.</p>
+          <p><strong>O manual oficial da GDI chama o campo de <code>channelId</code>.</strong> Testei em 08/10 se o nome era a causa: não é.</p>
+          <ul>
+            <li>Os quatro pedidos (<code>canalVideo</code> 0/1 e <code>channelId</code> 0/1) devolvem a mesma URL base; só o <code>eventLiveID</code> muda.</li>
+            <li>Resolução lida do SPS dentro do fluxo: 1920×1080 nos quatro.</li>
+            <li>No Moto G9, com build local mandando <code>channelId</code>: mesma imagem nas duas lentes.</li>
+            <li><strong>Prova definitiva:</strong> duas sessões ao mesmo tempo, <code>channelId</code> 0 e 1, entregaram <strong>237 de 237 pacotes de vídeo idênticos byte a byte</strong>. O controle (duas sessões da mesma lente) deu 94%, igual. Duas lentes diferentes não produzem os mesmos bytes codificados.</li>
+          </ul>
+          <p>Conclusão: a GDI entrega <strong>um único fluxo por câmera</strong> e ignora o campo da lente, seja qual for o nome. O código ficou como está.</p>
+          <p class="say-it">"Testei os dois nomes de campo do canal, o do Swagger e o do manual. Com sessões simultâneas, os pacotes das duas lentes são idênticos byte a byte, igual ao controle de uma lente só. A GDI entrega um fluxo por câmera. O app pede o canal certo e avisa."</p>
+        </div></details>
+      </div>
+    </article>
+
+    <article class="stop searchable" id="p8">
+      <div class="stop-head"><span class="stop-num">08</span><h3>Fechadura (RF05, RF06, RF09)</h3></div>
+      <div class="label">Fale</div>
+      <ul class="say"><li>Subdispositivo Zigbee: <code>ns</code> composto <code>NsFechadura_NsHub_IdProdutoHub</code>.</li><li>Cinco leituras em paralelo, isoladas: uma falha não derruba as outras.</li><li>Segurar 600 ms → diálogo de confirmação → comando → relê o estado. Testado no iPhone: abriu e fechou.</li></ul>
+      <div class="qa">
+        <details class="q"><summary>Por que o comando roda no ViewModel?</summary><div class="a"><p>É uma ação física: o pedido pode já ter chegado. No <code>viewModelScope</code>, girar ou sair não cancela; a tela nova recebe o resultado pelo <code>lockCommand</code>. Um comando por vez.</p></div></details>
+        <details class="q"><summary>E o volume?</summary><div class="a"><p>A API dá 500 na leitura. Investiguei só com leituras: o par certo de <code>ns</code> e <code>idProduto</code> dá 500 e o errado dá 404, então a falha é da API. O app avisa e mantém a troca habilitada; se a releitura falhar, assume o valor pedido.</p></div></details>
+        <details class="q"><summary>Histórico?</summary><div class="a"><p>10 eventos; "Ver mais" pede 30. Vazio e erro têm textos diferentes.</p></div></details>
+        <details class="q"><summary>Um bug que só o aparelho mostrou?</summary><div class="a"><p>A fechadura aparecia "Offline": o endpoint <code>online</code> também exige o <code>ns</code> composto para subdispositivo. Corrigi e criei teste de regressão.</p></div></details>
+      </div>
+    </article>
+
+    <article class="stop searchable" id="p9">
+      <div class="stop-head"><span class="stop-num">09</span><h3>Erros (RF04)</h3></div>
+      <div class="label">Fale</div>
+      <ul class="say"><li>Toda falha vira um <code>AppError</code> selado, num lugar só: <code>GdiErrorMapper</code>.</li><li>401 inválido, 403 expirado, sem rede, timeout, erro do servidor, vazio por filtro: mensagens próprias.</li><li>Detalhe técnico só em debug.</li></ul>
+      <div class="qa">
+        <details class="q"><summary>Token expirou no meio do uso?</summary><div class="a"><p>Renovo uma vez, serializado por <code>Mutex</code>: quem chega depois vê que o token já mudou e só repete. Se não der (renovar expirado dá 400), mantenho o status original e peço token novo. Prova: <code>parallelExpiredCallsRenewTheTokenOnlyOnce</code>.</p></div></details>
+        <details class="q"><summary>Cancelamento vira erro?</summary><div class="a"><p>Não: <code>resultOf</code> relança a <code>CancellationException</code>. O <code>runCatching</code> engoliria e mostraria "Job was cancelled".</p></div></details>
+        <details class="q"><summary><span class="qtext">A API manda erro com HTTP 200?<span class="kw">Sim: confiro os dois</span></span></summary><div class="a"><p>Para o app, sucesso é HTTP 2xx <strong>e</strong> envelope sem <code>"status":"erro"</code>. Quem faz essa checagem é o <code>successJson()</code> do <code>GdiApi</code>. Um 200 com erro vira <code>GdiException(200)</code> → <code>AppError.Server</code>, e não tenta renovar o token, porque não é 401 nem 403.</p></div></details>
+        <details class="q"><summary><span class="qtext">Caso novo: câmera em modo privacidade<span class="kw">200 + erro, mensagem genérica</span></span></summary><div class="a">
+          <p>Visto em 07/10 no Postman, ao criar o fluxo de vídeo: HTTP <strong>200 OK</strong> com o corpo abaixo.</p>
+          <pre class="tree">{"status": "erro",
+ "msg": "Erro desconhecido: The device has activated privacy mode. Please disable it and try again"}</pre>
+          <ul>
+            <li><strong>O que é:</strong> a câmera Imou/Mibo "fecha o olho" e recusa o vídeo. O modo é ligado no app Mibo ou por agendamento. Quem recusa é a câmera: o pedido está certo e a API só repassa a mensagem da Imou, em inglês.</li>
+            <li><strong>O app mostra hoje:</strong> "A plataforma Intelbras respondeu com erro (HTTP 200). Tente novamente em instantes." Esse texto confunde ("200" parece sucesso) e não ajuda ("tentar de novo" não resolve).</li>
+            <li><strong>Melhoria:</strong> reconhecer "privacy mode" no <code>GdiErrorMapper</code>, como já é feito com "expirado", e mostrar "A câmera está em modo privacidade. Desative no app Mibo e tente de novo.", com um teste. Não muda a tela.</li>
+            <li><strong>Não desligue:</strong> a câmera é da conta de teste da Intelbras, e a coleção nem tem rota para isso.</li>
+          </ul>
+          <p class="say-it">"A API às vezes manda erro com HTTP 200, por isso confiro o status e o envelope. Na revisão apareceu o modo privacidade da câmera, que cai nesse caminho com mensagem genérica. Como todo erro passa por um mapeador só, a melhoria é um ramo novo e um teste, sem mexer na tela."</p>
+        </div></details>
+      </div>
+    </article>
+
+    <article class="stop searchable" id="p10">
+      <div class="stop-head"><span class="stop-num">10</span><h3>Testes</h3></div>
+      <div class="label">Fale</div>
+      <ul class="say"><li>91 testes Kotlin na JVM e no simulador iOS, mais 4 em Java.</li><li>Fakes em vez de mocks, Arrange/Act/Assert, Ktor <code>MockEngine</code> simulando a API.</li></ul>
+      <div class="qa">
+        <details class="q"><summary>Um teste de que se orgulha?</summary><div class="a"><p>Duas chamadas paralelas com token vencido renovam uma vez só (barreira faz as duas saírem com o token antigo).</p></div></details>
+        <details class="q"><summary>Como testa corrotina?</summary><div class="a"><p><code>runTest</code> com tempo virtual: <code>advanceTimeBy</code> e <code>runCurrent</code>; o repositório roda no <code>backgroundScope</code>.</p></div></details>
+        <details class="q"><summary>Tem teste de UI?</summary><div class="a"><p>Não. Validei em aparelho com roteiro de 19 passos; teste de UI é o próximo passo.</p></div></details>
+      </div>
+    </article>
+
+    <article class="stop searchable" id="p11">
+      <div class="stop-head"><span class="stop-num">11</span><h3>Java e Swift (interop)</h3></div>
+      <div class="label">Fale</div>
+      <ul class="say"><li><code>CasaApplication</code> é Java e chama o Koin em Kotlin.</li><li>Teste JUnit em Java chama <code>TokenFormat</code> via <code>@JvmStatic</code>.</li><li>No iOS, o Swift implementa uma interface Kotlin (<code>NativeVideoPlayer</code>).</li></ul>
+      <div class="qa">
+        <details class="q"><summary>Por que a regra não é em Java?</summary><div class="a"><p>O código comum também roda no iOS, e Java não roda no iOS. Em Java eu teria de duplicar a regra em Swift.</p></div></details>
+        <details class="q"><summary>Como o Java vê o Kotlin?</summary><div class="a"><ul>
+          <li>Função de topo vira estático: <code>KoinKt.initKoin(...)</code>.</li>
+          <li>Tipo-função vira <code>Function1</code>, devolvendo <code>Unit.INSTANCE</code>.</li>
+          <li>Extensão vira estático com o receptor no 1º argumento.</li>
+          <li><code>object</code> sem <code>@JvmStatic</code> exige <code>.INSTANCE</code>.</li></ul></div></details>
+        <details class="q"><summary>Nulidade, valores padrão e exceções?</summary><div class="a"><ul>
+          <li>Kotlin gera <code>@Nullable</code>/<code>@NotNull</code>; tipo Java sem anotação vira platform type (<code>String!</code>).</li>
+          <li>Valor padrão precisa de <code>@JvmOverloads</code> (no Swift nem exporta: por isso existe <code>initKoin()</code> sem parâmetro).</li>
+          <li>Kotlin não tem exceção checada: <code>@Throws</code>. No player iOS os erros viram callback <code>onError</code>.</li></ul></div></details>
+      </div>
+    </article>
+
+    <article class="stop searchable" id="p12">
+      <div class="stop-head"><span class="stop-num">12</span><h3>Verificação e uso de IA</h3></div>
+      <p class="say-it">"Escrevi a especificação: contrato medido, marcos com critério de pronto, telas de referência e regras invioláveis. A IA implementou marco a marco, e nada avançava sem build verde nas duas plataformas e testes passando. Depois, revisão independente com cada achado confrontado, roteiro de 19 passos nos aparelhos reais e auditoria contra o case. Eu decidi stack, arquitetura e limites; a IA acelerou a escrita; a validação foi minha. Está em docs/sdd."</p>
+    </article>
+
+    <article class="stop searchable" id="p13">
+      <div class="stop-head"><span class="stop-num">13</span><h3>Limitações e próximos passos</h3></div>
+      <ul class="say">
+        <li>Teste de UI e modularização em módulos Gradle.</li>
+        <li>Parar o player em background também no iOS.</li>
+        <li>AAB com splits por ABI (APK debug ~165 MB por causa do libVLC).</li>
+        <li>Tela de licenças LGPL do libVLC/VLCKit.</li>
+        <li>Backend: guardar a credencial e receber webhooks (eventos em tempo real).</li>
+        <li>Volume: a API responde 500 na leitura desta fechadura.</li>
+        <li>Segunda lente da iM4 Dual: a GDI entrega um fluxo só, com <code>canalVideo</code> ou <code>channelId</code> (testado em 08/10). Depende da Intelbras.</li>
+        <li>Modo privacidade da câmera: hoje aparece como erro genérico "HTTP 200"; merece uma mensagem própria no <code>GdiErrorMapper</code>.</li>
+        <li>Job Android do CI falha na preparação do SDK; o iOS passa.</li>
+      </ul>
+    </article>
+  </section>
+
+  <!-- TOP 10 -->
+  <section id="provaveis">
+    <div class="section-head">
+      <h2>As 10 perguntas mais prováveis</h2>
+      <p>Em vermelho, a resposta em poucas palavras. Toque na pergunta para ver a resposta completa.</p>
+    </div>
+    <ol class="top10">
+      <li class="searchable"><a href="#p2">Por que KMP e Compose Multiplatform?</a><span class="kw">Código único compartilhado</span></li>
+      <li class="searchable"><a href="#p3">MVVM + Clean: onde está cada coisa e por que só dois casos de uso?</a><span class="kw">Camadas; só regra</span></li>
+      <li class="searchable"><a href="#mutex">Como evitou que um filtro antigo aparecesse e a dupla renovação do token? (concorrência)</a><span class="kw">Geração + Mutex</span></li>
+      <li class="searchable"><a href="#p7">Por que VLC e não Media3/AVPlayer?</a><span class="kw">SDP sem fmtp</span></li>
+      <li class="searchable"><a href="#p8">O que acontece ao girar a tela, ir para background ou sair no meio de um comando? (ciclo de vida)</a><span class="kw">viewModelScope sobrevive</span></li>
+      <li class="searchable"><a href="#p5">Onde e como o token é guardado, e como não vaza? (segurança)</a><span class="kw">Keystore/Keychain, sem logs</span></li>
+      <li class="searchable"><a href="#p11">Onde está o Java? (interop)</a><span class="kw">CasaApplication + JUnit</span></li>
+      <li class="searchable"><a href="#p3">Como entraria um segundo parceiro, e por que um módulo só?</a><span class="kw">Novo DeviceProvider; simplicidade</span></li>
+      <li class="searchable"><a href="#p10">Testes: o que cobre e o que falta?</a><span class="kw">Regras; falta UI</span></li>
+      <li class="searchable"><a href="#p12">Como usou a IA e como validou?</a><span class="kw">Spec, testes, aparelho</span></li>
+    </ol>
+  </section>
+
+  <!-- CAMINHOS -->
+  <section id="caminhos">
+    <div class="section-head">
+      <h2>Caminhos no código</h2>
+      <p>O que é disparado em sequência, com arquivo e linha. Os dois caminhos descem pelas mesmas camadas: tela → ViewModel → Repository → Provider → GdiApi.</p>
+    </div>
+
+    <article class="stop searchable" id="caminho-fechadura">
+      <div class="stop-head"><h3>Fechadura</h3></div>
+      <div class="flow">
+        <div class="flow-col">
+          <div class="flow-head">Leitura (ao abrir a tela)</div>
+          <div class="step"><strong>Home: toque na fechadura</strong><span><code>App.kt:66</code> → <code>DeviceRoute</code></span></div>
+          <div class="down" aria-hidden="true">↓</div>
+          <div class="step"><strong>LockScreen</strong><span><code>DeviceScreen.kt:224</code> <code>LaunchedEffect</code> → <code>vm.lockDetails</code>. Online à parte, na linha 229.</span></div>
+          <div class="down" aria-hidden="true">↓</div>
+          <div class="step"><strong>HomeViewModel</strong><span><code>:126</code> <code>resultOf { repository.lockDetails }</code></span></div>
+          <div class="down" aria-hidden="true">↓</div>
+          <div class="step"><strong>DeviceRepositoryImpl</strong><span><code>:211</code> <code>locksOf(lock).details(lock)</code></span></div>
+          <div class="down" aria-hidden="true">↓</div>
+          <div class="step"><strong>GdiLockController</strong><span><code>GdiDeviceProvider.kt:44</code>: 5 <code>async</code>, cada uma com <code>runCatching</code></span></div>
+        </div>
+        <div class="flow-col alt">
+          <div class="flow-head">Comando (abrir ou fechar)</div>
+          <div class="step"><strong>Toque longo no cadeado</strong><span><code>DeviceScreen.kt:289</code> <code>confirm = !open</code></span></div>
+          <div class="down" aria-hidden="true">↓</div>
+          <div class="step"><strong>Diálogo "Confirmar"</strong><span><code>:326</code> <code>vm.sendDoorCommand(lock, open)</code></span></div>
+          <div class="down" aria-hidden="true">↓</div>
+          <div class="step"><strong>runLockCommand</strong><span><code>HomeViewModel.kt:144</code>: <code>Sending</code> → <code>viewModelScope.launch</code>. Um comando por vez, e sobrevive a girar a tela.</span></div>
+          <div class="down" aria-hidden="true">↓</div>
+          <div class="step"><strong>DeviceRepositoryImpl</strong><span><code>:212</code> <code>setLock</code> → <code>locksOf(lock).setOpen</code></span></div>
+          <div class="down" aria-hidden="true">↓</div>
+          <div class="step"><strong>GdiLockController</strong><span><code>GdiDeviceProvider.kt:67</code> → <code>GdiApi.kt:111</code> <code>controle-fechadura</code></span></div>
+        </div>
+      </div>
+      <div class="down" aria-hidden="true">↓</div>
+      <div class="join"><strong>GdiApi.post → API GDI (HTTPS)</strong><span><code>GdiApi.kt:155</code>, com Bearer token. Em 401/403, renova uma vez com o Mutex.</span></div>
+      <div class="down" aria-hidden="true">↓</div>
+      <div class="join"><strong>Volta do comando</strong><span><code>LockCommand.Done</code> → <code>DeviceScreen.kt:240</code> <code>reload++</code> → relê o estado real pela coluna da leitura</span></div>
+      <div class="qa">
+        <details class="q"><summary><span class="qtext">Por que a fechadura tem 5 leituras?<span class="kw">Uma rota por dado</span></span></summary><div class="a">
+          <p>A GDI não tem uma rota de "detalhes da fechadura", então cada pedaço da tela vem de uma chamada:</p>
+          <ul><li><code>status-abertura</code> → o cadeado (aberta ou fechada)</li><li><code>status-abrir-remoto</code> → libera ou não o toque longo</li><li><code>bateria</code> → "Bateria 25%"</li><li><code>volume</code> → o cartão de volume (hoje dá 500)</li><li><code>historico-abertura</code> → a lista de eventos</li></ul>
+          <p><strong>Em paralelo:</strong> as leituras são independentes, então a tela espera a mais lenta (~1,4 s), não a soma.</p>
+          <p><strong>Com <code>runCatching</code>:</strong> sem ele, o 500 do volume cancelaria as irmãs (concorrência estruturada) e a tela ficaria vazia.</p>
+        </div></details>
+      </div>
+      <p class="say-it">"A GDI não tem uma rota de detalhes, então a tela da fechadura junta 5 leituras independentes em paralelo, e cada falha é isolada. O comando roda no viewModelScope, um por vez, e depois a tela relê o estado real."</p>
+    </article>
+
+    <article class="stop searchable" id="caminho-video">
+      <div class="stop-head"><h3>Vídeo</h3></div>
+      <div class="flow">
+        <div class="flow-col">
+          <div class="flow-head">Pedir a sessão (código comum)</div>
+          <div class="step"><strong>Home: toque na câmera</strong><span><code>App.kt:65</code> → <code>CameraRoute</code></span></div>
+          <div class="down" aria-hidden="true">↓</div>
+          <div class="step"><strong>CameraScreen</strong><span><code>:134</code> <code>LaunchedEffect(ns, liveAttempt, channel)</code> → <code>vm.startLive</code>. Trocar de lente ou "Tentar novamente" dispara de novo.</span></div>
+          <div class="down" aria-hidden="true">↓</div>
+          <div class="step"><strong>ViewModel → Repository → Provider</strong><span><code>HomeViewModel.kt:121</code> → <code>DeviceRepositoryImpl.kt:206</code> → <code>GdiDeviceProvider.kt:31</code> (<code>ns</code> puro)</span></div>
+          <div class="down" aria-hidden="true">↓</div>
+          <div class="step"><strong>GdiApi.createVideoStream</strong><span><code>GdiApi.kt:64</code> <code>criar-fluxo-video</code></span></div>
+          <div class="down" aria-hidden="true">↓</div>
+          <div class="step"><strong>StreamSession(url)</strong><span><code>rtsp://…</code> em ~2,4 s. Enquanto isso, a barra vai de 0 a 29% por estimativa (<code>CameraScreen.kt:142</code>).</span></div>
+        </div>
+        <div class="flow-col alt">
+          <div class="flow-head">Tocar (código nativo)</div>
+          <div class="step"><strong>CameraPlayer(url)</strong><span><code>CameraScreen.kt:201</code>. A declaração <code>expect</code> fica em <code>CameraPlayer.kt:11</code>.</span></div>
+          <div class="down" aria-hidden="true">↓</div>
+          <div class="step-pair">
+            <div class="step"><strong>Android</strong><span><code>CameraPlayer.android.kt:85</code>: libVLC, decodificação por software, sem áudio, na thread <code>vlc-control</code></span></div>
+            <div class="step"><strong>iOS</strong><span><code>CameraPlayer.ios.kt:48</code> → <code>VLCVideoPlayer.swift:27</code> (VLCKit)</span></div>
+          </div>
+          <div class="down" aria-hidden="true">↓</div>
+          <div class="step"><strong>RTSP com o servidor Imou</strong><span>OPTIONS → DESCRIBE (SDP sem <code>fmtp</code>) → SETUP → PLAY</span></div>
+          <div class="down" aria-hidden="true">↓</div>
+          <div class="step"><strong>Pacotes RTP</strong><span>O decodificador espera VPS/SPS/PPS chegarem no fluxo, junto do quadro-chave.</span></div>
+          <div class="down" aria-hidden="true">↓</div>
+          <div class="step"><strong>Ao vivo, 100%</strong><span>Android: evento <code>Vout</code> (linha 57). iOS: <code>onFirstFrame</code> (Swift, linha 76).</span></div>
+        </div>
+      </div>
+      <div class="down" aria-hidden="true">↓</div>
+      <div class="join"><strong>Ao sair da tela</strong><span><code>CameraScreen.kt:150</code> <code>onDispose</code> → <code>vm.stopLive</code> no <code>viewModelScope</code>, porque o escopo da tela já foi cancelado</span></div>
+      <p class="say-it">"No vídeo, o código comum só consegue a URL. Quem toca é o actual de cada plataforma: libVLC no Android e VLCKit em Swift no iOS, atrás de uma interface Kotlin."</p>
+    </article>
+  </section>
+
+  <!-- ENDPOINTS -->
+  <section id="endpoints">
+    <div class="section-head">
+      <h2>Endpoints em ordem</h2>
+      <p>Todas as chamadas são <strong>POST</strong> com corpo JSON, até as leituras. Base <code>https://api-casainteligente.intelbras.com.br</code>; cabeçalhos <code>Authorization: Bearer &lt;token&gt;</code> e <code>Content-Type: application/json</code>; a resposta é JSON servido como <code>text/plain</code>. A coluna "Postman" é a ordem em que você executou.</p>
+    </div>
+
+    <article class="stop searchable">
+      <div class="stop-head"><span class="stop-num">A</span><h3>Entrar (token, ou abrir com token salvo)</h3></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Postman</th><th>Endpoint</th><th>Corpo</th><th>O app usa</th></tr></thead>
+          <tbody>
+            <tr><td>1ª</td><td><code>/produtos/listar-dispositivos/v1</code></td><td><code>tamanhoPagina: 5, pagina: 1, origem: "todos"</code></td><td>A lista. Também serve para validar o token antes de gravar.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Os três campos são obrigatórios (sem <code>origem</code>, a API dá 500). Só em 401/403: <code>/autenticacao/renovar-token/v1</code>, com o token no cabeçalho <strong>e</strong> no corpo (<code>token</code>), uma vez, com Mutex; depois repete a chamada. Token expirado não renova: dá 400.</p>
+    </article>
+
+    <article class="stop searchable">
+      <div class="stop-head"><span class="stop-num">B</span><h3>Home (mesma rota, outros valores)</h3></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Ação</th><th>O que muda no corpo</th></tr></thead>
+          <tbody>
+            <tr><td>Carregar mais</td><td><code>pagina: 2, 3…</code>. Página cheia significa que há mais (a API não manda total).</td></tr>
+            <tr><td>Filtro</td><td><code>origem: "vinculados"</code> ou <code>"compartilhados"</code>, e volta para a página 1</td></tr>
+            <tr><td>Itens por página</td><td><code>tamanhoPagina: 2, 5, 10 ou 50</code>, e volta para a página 1</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="stop searchable">
+      <div class="stop-head"><span class="stop-num">C</span><h3>Fechadura (<code>ns</code> composto + <code>idProduto</code> da fechadura)</h3></div>
+      <p>Ao abrir a tela, saem <strong>6 chamadas ao mesmo tempo</strong>:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Postman</th><th>Endpoint</th><th>Corpo</th><th>O app usa</th></tr></thead>
+          <tbody>
+            <tr><td>2ª</td><td><code>/produtos/online/v1</code></td><td><code>ns</code></td><td>Ponto online</td></tr>
+            <tr><td>3ª</td><td><code>/fechaduras/status-abertura/v1</code></td><td><code>ns, idProduto</code></td><td><code>aberto</code> → o cadeado</td></tr>
+            <tr><td>4ª</td><td><code>/fechaduras/status-abrir-remoto/v1</code></td><td><code>ns, idProduto</code></td><td><code>habilitado</code> → libera o toque longo</td></tr>
+            <tr><td>5ª</td><td><code>/produtos/bateria/v1</code></td><td><code>ns, idProduto</code></td><td><code>bateria</code> (vem como texto)</td></tr>
+            <tr><td>6ª</td><td><code>/fechaduras/historico-abertura/v1</code></td><td><code>ns, quantidade: 10</code> (<strong>sem</strong> <code>idProduto</code>)</td><td>Eventos</td></tr>
+            <tr><td>7ª</td><td><code>/fechaduras/volume/v1</code></td><td><code>ns, idProduto</code></td><td>Volume (hoje dá 500)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <ul class="say">
+        <li>"Ver mais": histórico com <code>quantidade: 30</code>.</li>
+        <li>Abrir ou fechar: <code>/fechaduras/controle-fechadura/v1</code> com <code>ns, aberto: true|false, idProduto</code>. Depois, as 5 leituras de novo.</li>
+        <li>Mudar o volume: <code>/fechaduras/mudar-volume/v1</code> com <code>ns, idProduto, volume</code>. Depois, relê o volume.</li>
+      </ul>
+    </article>
+
+    <article class="stop searchable">
+      <div class="stop-head"><span class="stop-num">D</span><h3>Hub (<code>ns</code> puro)</h3></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Postman</th><th>Quando</th><th>Endpoint</th><th>Corpo</th></tr></thead>
+          <tbody>
+            <tr><td>2ª</td><td>Ao abrir a tela</td><td><code>/produtos/online/v1</code></td><td><code>ns</code></td></tr>
+            <tr><td>8ª</td><td>Ao tocar em firmware</td><td><code>/produtos/versao/v1</code></td><td><code>ns</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </article>
+
+    <article class="stop searchable">
+      <div class="stop-head"><span class="stop-num">E</span><h3>Câmera (<code>ns</code> puro)</h3></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Postman</th><th>Quando</th><th>Endpoint</th><th>Corpo</th><th>O app usa</th></tr></thead>
+          <tbody>
+            <tr><td>9ª</td><td>Ao abrir, trocar de lente ou tentar de novo</td><td><code>/cameras/criar-fluxo-video/v1</code></td><td><code>ns, stream_gb: 0.2, canalVideo: 0|1, streamId: 1</code></td><td><code>data.url</code> (<code>rtsp://</code>). O manual chama o canal de <code>channelId</code>; testado em 08/10, os dois nomes dão o mesmo fluxo.</td></tr>
+            <tr><td>—</td><td>Ao sair</td><td><code>/streaming/encerrar-sessao/v1</code></td><td><code>session_id</code></td><td>Só se existir, e a resposta real nunca traz</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Depois da URL, a conversa deixa de ser HTTP: o player fala RTSP com a Imou (OPTIONS → DESCRIBE → SETUP → PLAY). Com a câmera em modo privacidade, <code>criar-fluxo-video</code> responde 200 com <code>"status":"erro"</code>.</p>
+    </article>
+
+    <article class="stop searchable">
+      <div class="stop-head"><h3>As 4 regras de parâmetro que mais caem</h3></div>
+      <ol class="say">
+        <li><strong>Fechadura:</strong> <code>ns</code> composto <code>NsFechadura_NsHub_IdProdutoHub</code> + o <code>idProduto</code> da própria fechadura.</li>
+        <li><strong>Hub e câmera:</strong> <code>ns</code> puro.</li>
+        <li><strong>Histórico:</strong> não leva <code>idProduto</code>.</li>
+        <li><strong>Listagem:</strong> <code>origem</code> vai no plural no pedido (<code>todos</code>) e vem no singular em cada item.</li>
+      </ol>
+      <p class="note">No código: uma função por endpoint a partir de <code>GdiApi.kt:53</code>, e todas passam pelo <code>post()</code> da linha 155.</p>
+      <p class="say-it">"Na GDI tudo é POST com corpo JSON, até as leituras. A fechadura é a parte mais delicada: é um subdispositivo, então leva ns composto, e o histórico é a exceção sem idProduto."</p>
+    </article>
+  </section>
+
+  <!-- DUAS ABORDAGENS -->
+  <section id="abordagens">
+    <div class="section-head">
+      <h2>As duas abordagens de KMP</h2>
+      <p>O projeto da raiz (Compose Multiplatform) e o <code>native-ui/</code> (UI nativa + <code>shared</code> só com lógica), construído em 08/10 sem tocar no primeiro. Em vermelho, a resposta curta.</p>
+    </div>
+
+    <article class="stop searchable" id="enunciado">
+      <div class="stop-head"><h3>O que o enunciado pedia</h3></div>
+      <ul class="say">
+        <li>"Aplicação funcional, com o <strong>stack predominante em Kotlin/KMP</strong>."</li>
+        <li>Pontuação adicional: "Utilização da linguagem Kotlin/KMP" e "Utilização da linguagem <strong>Java</strong>".</li>
+        <li>Conhecimento técnico: "Domínio de <strong>Android</strong>/Kotlin/KMP, ciclo de vida, concorrência, consumo de APIs, persistência local, segurança e interoperabilidade com Java."</li>
+      </ul>
+      <div class="qa">
+        <details class="q"><summary><span class="qtext">O enunciado exigia Compose? E iOS?<span class="kw">Não: escolhas minhas</span></span></summary><div class="a"><p>Compose não aparece (nem Jetpack, nem Multiplatform) e iOS também não; o texto fala em "Android/Kotlin/KMP". "UI 100 % em Compose Multiplatform" e o iPhone funcionando foram decisões minhas, para levar o KMP ao máximo. Java pontua à parte: por isso a <code>CasaApplication</code> em Java e o teste JUnit em Java.</p></div></details>
+      </div>
+      <p class="say-it">"O enunciado pedia Kotlin/KMP predominante e Android. Escolhi Compose Multiplatform e entreguei também o iOS, porque era a forma de levar o KMP mais longe. Depois montei a variante com UI nativa para medir o custo de cada caminho."</p>
+    </article>
+
+    <article class="stop searchable" id="native-ui">
+      <div class="stop-head"><h3>Como ficou o <code>native-ui/</code></h3></div>
+      <pre class="tree">Raiz (Compose Multiplatform)              native-ui (UI nativa + shared)
+shared/                                   shared/
+  domain, data, di                          domain, data, di           ← iguais
+  ui/ (todas as telas, Compose MP)          sdk/CasaSdk.kt             ← ponte para o Swift
+  player/ (expect/actual)                   (sem ui, sem player)
+  platform/ (isDebugBuild, WeekStrip)
+androidApp/                               androidApp/
+  MainActivity: setContent { App() }        ui/ (as mesmas telas, Jetpack Compose AndroidX)
+                                            HomeViewModel, player libVLC, calendário
+                                            di/UiModule.kt (viewModelOf)
+iosApp/                                   iosApp/
+  ContentView: ComposeUIViewController      Models/ (ObservableObject sobre o CasaSdk)
+  VLCVideoPlayer.swift (interface Kotlin)   Views/ (SwiftUI), Player/VLCPlayerView.swift</pre>
+      <div class="qa">
+        <details class="q"><summary><span class="qtext">O que é a ponte <code>CasaSdk</code>?<span class="kw">StateWatcher + Outcome</span></span></summary><div class="a"><ul>
+          <li><code>Flow</code> não atravessa para o Swift → <code>StateWatcher&lt;T&gt;</code>: <code>value</code> síncrono + <code>watch { }</code> com <code>WatchHandle.cancel()</code>.</li>
+          <li>Exceção em <code>suspend</code> derruba o app → tudo devolve <code>Outcome&lt;T&gt;</code> (<code>valueOrNull</code>/<code>errorOrNull</code>) com o <code>AppError</code> já mapeado.</li>
+          <li><code>Int</code> vira <code>Int32</code>, sem valor padrão, callbacks no Main. Alternativa de mercado: SKIE.</li>
+          <li>O Android não usa a ponte: injeta repositórios e casos de uso direto no seu ViewModel. Testada no comum (<code>CasaSdkTest</code>), JVM e simulador iOS.</li></ul></div></details>
+        <details class="q"><summary><span class="qtext">As bibliotecas mudaram?<span class="kw">Mesmos pacotes, outro grupo Maven</span></span></summary><div class="a"><ul>
+          <li><code>shared</code>: saíram Compose, lifecycle/navigation JetBrains, <code>koin-compose-viewmodel</code> e libVLC; ficaram Ktor, kotlinx, Koin.</li>
+          <li><code>androidApp</code>: <code>org.jetbrains.compose.*</code> → <code>androidx.compose.*</code> (mesmas versões 1.12.1). O pacote Kotlin é <code>androidx.compose.*</code> nos dois, por isso os <code>import</code> não mudaram; só o <code>koinViewModel</code> (de <code>org.koin.androidx.compose</code>).</li>
+          <li><code>iosApp</code>: VLCKit continua (SPM); Compose saiu; entrou SwiftUI, que é do sistema.</li>
+          <li>Repositórios: Google Maven para <code>androidx.*</code>/<code>com.android.*</code>; Maven Central para <code>org.jetbrains.*</code>, Ktor, Koin, libVLC; SPM (GitHub) para o VLCKit.</li></ul></div></details>
+        <details class="q"><summary><span class="qtext">Verificado onde?<span class="kw">Moto G9 e iPhone 13 Pro</span></span></summary><div class="a"><p>Os dois apps nativos com a API real em 08/10: token → Home (3 dispositivos) → fechadura só leitura → hub → câmera ao vivo. 80 testes no <code>shared</code> (JVM e simulador iOS) + 16 no Android. No iOS o percurso foi feito por XCUITest que nunca toca em "Confirmar".</p></div></details>
+      </div>
+    </article>
+
+    <article class="stop searchable" id="comparacao">
+      <div class="stop-head"><h3>Vantagens e desvantagens, com o que foi medido</h3></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>Compose Multiplatform (raiz)</th><th>UI nativa + shared (native-ui)</th></tr></thead>
+          <tbody>
+            <tr><td>Código de tela</td><td><strong>2 867 linhas, uma vez</strong></td><td>3 121 Kotlin + 1 589 Swift + 156 da ponte: UI em dobro</td></tr>
+            <tr><td>Framework iOS (Debug)</td><td>371 MB, com Compose e Skia</td><td><strong>56 MB</strong>, só Kotlin</td></tr>
+            <tr><td>Visual no iPhone</td><td>Material, desenhado pelo Skia; <code>FitText</code> e insets à mão</td><td>100 % iOS: List, NavigationStack, voltar por deslize, Dynamic Type</td></tr>
+            <tr><td>ViewModel</td><td>Um só, compartilhado</td><td>Um por plataforma: lógica de apresentação escrita duas vezes</td></tr>
+            <tr><td>Ponte Kotlin → Swift</td><td>Quase nenhuma</td><td><code>CasaSdk</code> (ou SKIE)</td></tr>
+            <tr><td>Testes</td><td>91 no comum cobrem ViewModel e tela</td><td>80 + 16; os <code>ObservableObject</code> em Swift só têm o UI test</td></tr>
+            <tr><td>1.º quadro a frio</td><td>22,6 s Android · 39,2 s iPhone</td><td>26,3 s · 53,0 s (uma medição; a variação é da nuvem Imou)</td></tr>
+            <tr><td>APK</td><td>159 MB</td><td>159 MB: o peso é o libVLC</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="qa">
+        <details class="q"><summary><span class="qtext">Melhora alguma coisa usar uma ou outra?<span class="kw">Nativo: tamanho e iOS. CMP: código e testes</span></span></summary><div class="a"><ul>
+          <li><strong>UI nativa melhora:</strong> framework iOS (371 → 56 MB), sensação de iOS de graça, zero dependência do Compose no iOS, times em paralelo.</li>
+          <li><strong>Compose Multiplatform melhora:</strong> metade do código de tela, consistência entre plataformas, lógica de apresentação testada uma vez, uma pessoa entrega tudo.</li>
+          <li><strong>Não muda:</strong> velocidade do vídeo (gargalo é a nuvem e o SDP sem <code>fmtp</code>; o player é o mesmo VLC), APK (libVLC), regra de negócio (idêntica).</li></ul></div></details>
+        <details class="q"><summary><span class="qtext">Qual escolher?<span class="kw">Case: CMP. Produto: meio-termo</span></span></summary><div class="a"><p>Para o case, Compose Multiplatform: pontua KMP, tempo curto, uma pessoa, referência visual Material. Para um produto em escala, o meio-termo: ViewModel e apresentação no <code>shared</code> (o ViewModel da JetBrains roda no iOS) e só a camada de tela nativa. A ponte <code>CasaSdk</code> é exatamente a peça que esse meio-termo precisa.</p></div></details>
+      </div>
+      <p class="say-it">"Nativo melhora tamanho e sensação de iOS; Compose Multiplatform melhora quantidade de código, consistência e testes. Vídeo e APK não mudam. Para o case, Compose; para produto, ViewModel compartilhado com tela nativa."</p>
+    </article>
+
+    <article class="stop searchable" id="pixel">
+      <div class="stop-head"><h3>Mapeia nativo × desenha pixel a pixel</h3></div>
+      <p>KMP <strong>não é framework de UI</strong>: é a lógica compartilhada. Quem desenha a tela é a escolha feita em cima dele. Analogia: KMP está para o Compose Multiplatform como o .NET está para o MAUI.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tecnologia</th><th>O que é</th><th>Quem desenha</th></tr></thead>
+          <tbody>
+            <tr><td>.NET MAUI</td><td>Lógica em C# + UI abstrata</td><td><strong>Mapeia</strong> para widgets nativos</td></tr>
+            <tr><td>Flutter</td><td>Lógica em Dart + UI própria</td><td><strong>Pixel a pixel</strong> (Skia/Impeller)</td></tr>
+            <tr><td>Kotlin Android com Views (XML)</td><td>Só Android</td><td><strong>Nativo</strong>: widgets do sistema</td></tr>
+            <tr><td>Kotlin Android com Jetpack Compose</td><td>Só Android</td><td><strong>Pixel a pixel</strong> no Canvas (Skia por baixo); não usa Views</td></tr>
+            <tr><td>KMP sozinho</td><td>Lógica compilada para JVM e nativo</td><td><strong>Ninguém</strong>: não tem UI</td></tr>
+            <tr><td>KMP + Compose Multiplatform (raiz)</td><td>Lógica e UI em Kotlin</td><td><strong>Pixel a pixel</strong>: Skia + Metal no iOS, Canvas no Android</td></tr>
+            <tr><td>KMP + UI nativa (native-ui)</td><td>Lógica em Kotlin, UI por plataforma</td><td><strong>Nativo</strong>: SwiftUI e Jetpack Compose</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <pre class="tree">Views XML ─ SwiftUI ─ MAUI ─────────── Jetpack Compose ─ Compose Multiplatform ─ Flutter
+  nativo     nativo    mapeia nativo      pixel a pixel       pixel a pixel        pixel a pixel</pre>
+      <div class="qa">
+        <details class="q"><summary><span class="qtext">O que continua nativo no iOS com Compose?<span class="kw">Teclado, VoiceOver, interop</span></span></summary><div class="a"><p>Entrada de texto e teclado (<code>UITextInput</code>), acessibilidade espelhada para o VoiceOver, views por interop (o player VLC é uma <code>UIView</code> real via <code>UIKitView</code>) e o ciclo de vida do <code>UIViewController</code> que hospeda tudo. O resto é o Compose pintando numa camada Metal.</p></div></details>
+        <details class="q"><summary><span class="qtext">Onde isso apareceu no projeto?<span class="kw">Material, FitText, 371 MB</span></span></summary><div class="a"><ul><li>Visual Material no iPhone: é o Compose desenhando, não o UIKit.</li><li>O banner que quebrava em 390 pt: medição de texto do Skia → <code>FitText</code>.</li><li>Sem voltar por deslize do sistema: botão próprio.</li><li>Framework de 371 MB: o motor gráfico vai no binário; sem ele, 56 MB.</li><li>Vídeo: indiferente, o VLC exibe numa view nativa nas duas abordagens.</li></ul></div></details>
+      </div>
+      <p class="say-it">"Compose Multiplatform desenha pixel a pixel com Skia, no Android e no iOS; não mapeia para UIKit. SwiftUI é o próprio sistema desenhando. KMP é só a lógica; a UI é escolha à parte, e eu entreguei as duas variantes."</p>
+    </article>
+  </section>
+
+  <!-- COMPOSE -->
+  <section id="compose">
+    <div class="section-head">
+      <h2>Compose (UI)</h2>
+      <p>Em vermelho, a resposta em poucas palavras. Toque na pergunta para ver a resposta completa, com o exemplo do projeto.</p>
+    </div>
+
+    <article class="stop searchable" id="kotlin-kmp">
+      <div class="stop-head"><h3>Kotlin × KMP, Jetpack × Multiplatform</h3></div>
+      <p><strong>Kotlin é a linguagem.</strong> O que muda no KMP é <strong>para onde ela compila</strong>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th></th><th>Kotlin "Android"</th><th>KMP (o nosso caso)</th></tr></thead>
+          <tbody>
+            <tr><td>Compila para</td><td>Bytecode JVM, que vira o APK</td><td>Android: JVM. iOS: <strong>Kotlin/Native</strong>, código de máquina ARM num framework <code>Shared</code> que o Swift importa</td></tr>
+            <tr><td>Onde o código mora</td><td>Um só lugar</td><td><code>commonMain</code> + <code>androidMain</code> + <code>iosMain</code></td></tr>
+            <tr><td>No comum pode usar</td><td>Tudo do Android e do JDK</td><td>Só Kotlin puro e bibliotecas multiplataforma (<code>kotlinx.*</code>, Ktor, Koin, Compose MP). Nada de <code>Context</code>, <code>Log</code>, <code>java.time</code>, <code>java.io</code></td></tr>
+            <tr><td>Quando falta algo</td><td>—</td><td><code>expect/actual</code> ou interface + injeção</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p class="note">Por isso o <code>WeekStrip</code> tem <code>java.time</code> no Android e <code>NSCalendar</code> no iOS, e a <code>TokenFormat</code> é Kotlin puro: o <code>commonMain</code> não compila Java.</p>
+      <div class="qa">
+        <details class="q"><summary><span class="qtext">Jetpack Compose × Compose Multiplatform?<span class="kw">Mesma API; Skia no iOS</span></span></summary><div class="a"><ul>
+          <li><strong>Jetpack Compose:</strong> toolkit de UI da Google, só Android.</li>
+          <li><strong>Compose Multiplatform:</strong> versão da JetBrains da <strong>mesma API</strong>. Os pacotes continuam <code>androidx.compose.*</code>; <code>Column</code>, <code>remember</code>, <code>LaunchedEffect</code> são os mesmos. No Android ele <strong>é</strong> o Jetpack Compose; no iOS desenha tudo com o <strong>Skia</strong> (o motor do Chrome e do Flutter) dentro de uma <code>UIView</code>.</li>
+          <li>Lifecycle, ViewModel e Navigation vieram das versões multiplataforma da JetBrains (<code>org.jetbrains.androidx.*</code>), com a mesma API do AndroidX.</li>
+          <li>Para quem sabe Jetpack Compose, escrever a tela é igual. O que muda é a montagem e o comportamento no iPhone.</li></ul></div></details>
+        <details class="q"><summary><span class="qtext">Como montamos?<span class="kw">Uma árvore, duas portas</span></span></summary><div class="a"><ol class="say">
+          <li><strong>Plugins e alvos</strong> (<code>shared/build.gradle.kts</code>): <code>kotlinMultiplatform</code>, <code>androidMultiplatformLibrary</code>, <code>composeMultiplatform</code>, <code>composeCompiler</code>. Alvos Android, <code>iosArm64</code> (iPhone físico) e <code>iosSimulatorArm64</code>; framework <strong>estático</strong> <code>Shared</code>.</li>
+          <li><strong>Dependências no <code>commonMain</code>:</strong> <code>compose.runtime</code>, <code>foundation</code>, <code>material3</code>, <code>ui</code>, ícones estendidos, lifecycle, navigation, <code>koin-compose-viewmodel</code>.</li>
+          <li><strong>Portas de entrada:</strong> Android <code>MainActivity.setContent { App() }</code>; iOS <code>MainViewController() = ComposeUIViewController { App() }</code>, embrulhado num <code>UIViewControllerRepresentable</code> em <code>ContentView.swift</code>.</li>
+          <li><strong>Todas as telas no comum:</strong> token, Home, câmera, fechadura, hub, diálogos e navegação tipada. Só o player é nativo, pelas pontes <code>AndroidView</code> e <code>UIKitView</code>.</li>
+          <li><strong>Testes:</strong> o <code>commonTest</code> roda na JVM e no simulador iOS; os 91 passam nos dois.</li></ol></div></details>
+        <details class="q"><summary><span class="qtext">O que é diferente no iPhone, na prática?<span class="kw">Fonte, insets, voltar, interop</span></span></summary><div class="a">
+          <div class="table-wrap"><table>
+            <thead><tr><th>Diferença</th><th>No projeto</th></tr></thead>
+            <tbody>
+              <tr><td>Desenho por Skia, não UIKit</td><td>Visual Material no iPhone; aceito porque a referência é o app Mibo</td></tr>
+              <tr><td>Texto e fontes</td><td>O banner quebrava em 390 pt → <code>FitText</code></td></tr>
+              <tr><td>Áreas seguras</td><td>Insets no aviso de erro da câmera</td></tr>
+              <tr><td>Sem "voltar" do sistema</td><td>Botão próprio na barra e o <code>popIfTop</code> contra o duplo toque</td></tr>
+              <tr><td>Sem <code>BuildConfig</code></td><td><code>isDebugBuild</code> via <code>expect/actual</code></td></tr>
+              <tr><td>Binário maior</td><td>Runtime Kotlin + Skia no app</td></tr>
+              <tr><td>Interop com o Swift</td><td><code>Int</code> vira <code>Int32</code>; valor padrão não é exportado (<code>initKoin()</code> sem parâmetro); <code>Flow</code> não atravessa, então o player usa uma interface de listener; <code>suspend</code> vira completion handler</td></tr>
+            </tbody>
+          </table></div>
+        </div></details>
+      </div>
+      <p class="say-it">"Kotlin é a linguagem; KMP é compilar a mesma linguagem para JVM no Android e para código nativo no iOS, com o código dividido em comum e por plataforma. O Compose Multiplatform é a mesma API do Jetpack Compose, desenhada com Skia no iOS. Escrevi as telas uma vez no comum, com duas portas de entrada: setContent no Android e ComposeUIViewController no iOS. O que muda no iPhone é fonte, insets, voltar e interop com o Swift; o player é o único ponto nativo."</p>
+    </article>
+
+    <article class="stop searchable">
+      <div class="stop-head"><h3>Fundamentos</h3></div>
+      <div class="qa">
+        <details class="q"><summary><span class="qtext">O que é Compose / UI declarativa?<span class="kw">Estado desenha tela</span></span></summary><div class="a"><p>Descrevo como a tela fica para um estado, e o Compose redesenha quando o estado muda. Não altero a view à mão, como no XML.</p></div></details>
+        <details class="q"><summary><span class="qtext">O que é recomposição?<span class="kw">Redesenha só mudanças</span></span></summary><div class="a"><p>O Compose chama de novo só as funções que leram um estado que mudou. Por isso <code>@Composable</code> não deve ter efeito colateral solto.</p></div></details>
+        <details class="q"><summary><span class="qtext">Jetpack Compose e Compose Multiplatform são a mesma coisa?<span class="kw">Mesma API</span></span></summary><div class="a"><p>A API é a mesma (<code>@Composable</code>, <code>remember</code>, <code>Modifier</code>, Material 3). A JetBrains leva para iOS, desktop e web. No iOS a árvore roda dentro de um <code>ComposeUIViewController</code> e desenha com o Skia.</p></div></details>
+      </div>
+    </article>
+
+    <article class="stop searchable">
+      <div class="stop-head"><h3>Estado</h3></div>
+      <div class="qa">
+        <details class="q"><summary><span class="qtext">remember × rememberSaveable?<span class="kw">Saveable sobrevive rotação</span></span></summary><div class="a"><p><code>remember</code> guarda entre recomposições e perde ao girar. <code>rememberSaveable</code> sobrevive à rotação e à morte do processo. Usei na aba, grade/lista, lente e tela cheia. No token usei <code>remember</code> de propósito, para ele não ir ao estado salvo do sistema.</p></div></details>
+        <details class="q"><summary><span class="qtext">Onde mora o estado?<span class="kw">ViewModel, StateFlow</span></span></summary><div class="a"><p>No ViewModel, como <code>StateFlow</code>. A tela coleta e devolve eventos chamando funções do ViewModel: state hoisting com fluxo unidirecional. Estado só visual (diálogo aberto) fica local.</p></div></details>
+        <details class="q"><summary><span class="qtext">Por que collectAsStateWithLifecycle e não collectAsState?<span class="kw">Coleta só visível</span></span></summary><div class="a"><p>Para de coletar quando a tela sai de cena (ON_STOP): menos trabalho e nenhuma atualização em tela invisível.</p></div></details>
+        <details class="q"><summary><span class="qtext">Por que estado imutável?<span class="kw">Comparação confiável</span></span></summary><div class="a"><p><code>data class</code> com <code>copy()</code> e <code>List</code>, não lista mutável. O Compose compara estados para decidir o que redesenhar; imutável torna a comparação confiável.</p></div></details>
+      </div>
+    </article>
+
+    <article class="stop searchable">
+      <div class="stop-head"><h3>Efeitos colaterais e ciclo de vida</h3></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Efeito</th><th>Para quê · no projeto</th></tr></thead>
+          <tbody>
+            <tr><td>LaunchedEffect(chaves)</td><td>Corrotina ligada à composição; reinicia quando a chave muda. Pede a sessão de vídeo quando muda câmera, tentativa ou lente; relê a fechadura.</td></tr>
+            <tr><td>DisposableEffect</td><td>Algo que precisa de limpeza ao sair. Libera o player e encerra a sessão; registra e remove o observer de ciclo de vida.</td></tr>
+            <tr><td>rememberCoroutineScope</td><td>Corrotina a partir de um clique: o Snackbar. Os comandos da fechadura foram para o <code>viewModelScope</code>.</td></tr>
+            <tr><td>rememberUpdatedState</td><td>Callback longo sempre com o valor mais novo: o listener do player chama a lambda de progresso atual.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="qa">
+        <details class="q"><summary><span class="qtext">Pode navegar durante a composição?<span class="kw">Não: LaunchedEffect</span></span></summary><div class="a"><p>Não. Se a câmera some da lista, a volta é feita em <code>LaunchedEffect(Unit) { onBack() }</code>.</p></div></details>
+      </div>
+    </article>
+
+    <article class="stop searchable">
+      <div class="stop-head"><h3>Layout e Modifier</h3></div>
+      <div class="qa">
+        <details class="q"><summary><span class="qtext">A ordem do Modifier importa?<span class="kw">Sim, em sequência</span></span></summary><div class="a"><p>Sim: <code>padding().background()</code> pinta só dentro do padding; <code>background().padding()</code> pinta o padding junto.</p></div></details>
+        <details class="q"><summary><span class="qtext">Cards da grade com a mesma altura?<span class="kw">IntrinsicSize.Max</span></span></summary><div class="a"><p><code>Row(Modifier.height(IntrinsicSize.Max))</code> com <code>fillMaxHeight()</code> em cada card: a linha mede o mais alto e iguala o outro.</p></div></details>
+        <details class="q"><summary><span class="qtext">Desenho customizado?<span class="kw">Canvas</span></span></summary><div class="a"><p>O hub é desenhado com <code>Canvas</code> (círculos e anel), sem imagem de produto.</p></div></details>
+        <details class="q"><summary><span class="qtext">Edge-to-edge?<span class="kw">statusBarsPadding + insets</span></span></summary><div class="a"><p>Barra de status transparente; cada cabeçalho aplica <code>statusBarsPadding()</code> e o <code>Scaffold</code> controla os insets com <code>contentWindowInsets</code>.</p></div></details>
+        <details class="q"><summary><span class="qtext">Texto que não cabe?<span class="kw">FitText (auto-size)</span></span></summary><div class="a"><p><code>FitText</code> (<code>BasicText</code> com auto-size): a fonte diminui até caber. Usei <code>Clip</code> e não reticências porque no iOS o Compose não informa a linha cortada e o texto não encolhia.</p></div></details>
+      </div>
+    </article>
+
+    <article class="stop searchable">
+      <div class="stop-head"><h3>Identidade e performance</h3></div>
+      <div class="qa">
+        <details class="q"><summary><span class="qtext">Como a tela cheia não reinicia o vídeo?<span class="kw">Mesmo nó</span></span></summary><div class="a"><p>O <code>Box</code> do vídeo é o mesmo nó nos dois modos; só muda o <code>Modifier</code>. Um <code>if</code> criando outro ramo faria o Compose destruir o player.</p></div></details>
+        <details class="q"><summary><span class="qtext">Para que serve key()?<span class="kw">Identidade do bloco</span></span></summary><div class="a"><p>Diz ao Compose quando um bloco é "outro". No iOS, <code>key(url)</code> recria o player quando a URL muda.</p></div></details>
+        <details class="q"><summary><span class="qtext">A lista é lazy?<span class="kw">Não; LazyVerticalGrid</span></span></summary><div class="a"><p>Não: <code>Column</code> com rolagem, poucos aparelhos, paginação de 5 em 5. Para muitos itens: <code>LazyVerticalGrid</code> com <code>key</code> por item, compondo só o visível.</p></div></details>
+        <details class="q"><summary><span class="qtext">Como evita recomposição desnecessária?<span class="kw">Imutável, derivedStateOf</span></span></summary><div class="a"><p>Estado imutável e lido perto de onde é usado. Também: <code>derivedStateOf</code> para valor que deriva de outro que muda muito, e lambdas estáveis.</p></div></details>
+      </div>
+    </article>
+
+    <article class="stop searchable">
+      <div class="stop-head"><h3>CompositionLocal, gestos e animação</h3></div>
+      <div class="qa">
+        <details class="q"><summary><span class="qtext">Já usou CompositionLocal?<span class="kw">LocalViewConfiguration 600 ms</span></span></summary><div class="a"><p>Sim, no círculo da fechadura: o "segurar" padrão dura ~400–500 ms e eu precisava de 600 ms. Sobrescrevi o <code>LocalViewConfiguration</code> só nesse nó, com <code>CompositionLocalProvider</code>.</p></div></details>
+        <details class="q"><summary><span class="qtext">Gestos?<span class="kw">combinedClickable</span></span></summary><div class="a"><p><code>combinedClickable</code> com toque e toque longo no círculo da fechadura.</p></div></details>
+        <details class="q"><summary><span class="qtext">Animação?<span class="kw">AnimatedVisibility</span></span></summary><div class="a"><p><code>AnimatedVisibility</code> abre e fecha o cartão de volume.</p></div></details>
+      </div>
+    </article>
+
+    <article class="stop searchable">
+      <div class="stop-head"><h3>Interop com o nativo</h3></div>
+      <div class="qa">
+        <details class="q"><summary><span class="qtext">Como pôs uma view nativa no Compose?<span class="kw">AndroidView / UIKitView</span></span></summary><div class="a"><p>Android: <code>AndroidView(factory = { VLCVideoLayout(...) })</code> para o libVLC. iOS: <code>UIKitView</code>, com a view criada em Swift pelo VLCKit.</p></div></details>
+        <details class="q"><summary><span class="qtext">E o contrário?<span class="kw">setContent / ComposeUIViewController</span></span></summary><div class="a"><p>Android: <code>setContent { App() }</code>. iOS: o SwiftUI hospeda o <code>MainViewController()</code>, que devolve um <code>ComposeUIViewController</code>.</p></div></details>
+      </div>
+    </article>
+
+    <article class="stop searchable">
+      <div class="stop-head"><h3>Testes e acessibilidade</h3></div>
+      <div class="qa">
+        <details class="q"><summary><span class="qtext">Tem teste de UI?<span class="kw">Não; runComposeUiTest</span></span></summary><div class="a"><p>Não. Validei com o roteiro de 19 passos nos aparelhos e comparação visual. Próximo passo: <code>runComposeUiTest</code> (multiplataforma) ou <code>createComposeRule</code> no Android, achando elementos por texto ou <code>contentDescription</code>.</p></div></details>
+        <details class="q"><summary><span class="qtext">Acessibilidade?<span class="kw">contentDescription + semantics</span></span></summary><div class="a"><p>Ícones clicáveis têm <code>contentDescription</code> ("Voltar", "Tela cheia", "Abrir controle PTZ"). O círculo da fechadura tem <code>semantics</code> com papel de botão e a ação descrita.</p></div></details>
+      </div>
+    </article>
+  </section>
+
+  <!-- EXTRAS -->
+  <section id="extras">
+    <div class="section-head">
+      <h2>Além do app</h2>
+      <p>AWS, KMP × nativo, VLC, SDP e a velocidade do app oficial. Em vermelho, a resposta curta.</p>
+    </div>
+    <article class="stop searchable">
+      <div class="stop-head"><h3>AWS e backend</h3></div>
+      <div class="qa">
+        <details class="q"><summary><span class="qtext">Onde a API da Intelbras roda?<span class="kw">API Gateway, São Paulo</span></span></summary><div class="a"><p>O domínio aponta para <code>execute-api.sa-east-1.amazonaws.com</code>: Amazon API Gateway na região São Paulo. A resposta traz o cabeçalho <code>apigw-requestid</code>.</p></div></details>
+        <details class="q"><summary><span class="qtext">O que isso explica no projeto?<span class="kw">Erros do Gateway</span></span></summary><div class="a"><ul><li><code>{"message":"Forbidden"}</code> e <code>{"message":"Internal Server Error"}</code> são mensagens padrão do Gateway: por isso o parser procura <code>msg</code> e depois <code>message</code>.</li><li>JSON como <code>text/plain</code>: hipótese provável, a função por trás (Lambda) não declara o <code>Content-Type</code>. Diga "compatível com", não "é".</li></ul></div></details>
+        <details class="q"><summary><span class="qtext">Como seria um backend próprio?<span class="kw">BFF na AWS</span></span></summary><div class="a"><ul><li>API Gateway + Lambda guardando a credencial da GDI no Secrets Manager; o app recebe só URLs de vídeo curtas.</li><li>Cognito para login com OAuth no lugar do token colado.</li><li>Webhooks da GDI → Gateway/Lambda → SNS (push FCM/APNs): eventos em tempo real.</li><li>DynamoDB: cache da lista e histórico de eventos.</li></ul></div></details>
+        <details class="q"><summary><span class="qtext">O que muda no app com o backend?<span class="kw">Novo DeviceProvider</span></span></summary><div class="a"><p>Pouco: continua HTTP via Ktor (o Amplify não é KMP). O BFF entra como novo <code>DeviceProvider</code> ou nova <code>baseUrl</code>; o <code>TokenRepository</code> guardaria o token do Cognito no mesmo Keystore/Keychain.</p></div></details>
+      </div>
+    </article>
+    <article class="stop searchable">
+      <div class="stop-head"><h3>KMP ou nativo separado?</h3></div>
+      <div class="qa">
+        <p class="note">Construído e medido em 08/10: veja <a href="#abordagens">As duas abordagens de KMP</a>.</p>
+        <details class="q"><summary><span class="qtext">KMP ou Kotlin + Compose e SwiftUI separados?<span class="kw">KMP no case</span></span></summary><div class="a"><ul><li>KMP: regra da API escrita e testada uma vez; uma pessoa entrega as duas plataformas.</li><li>Nativo: visual 100% iOS e acesso imediato às APIs da Apple, mas regra duplicada, duas suítes, dois times.</li><li>No case só o cofre do token e o player precisaram de nativo.</li></ul></div></details>
+        <details class="q"><summary><span class="qtext">E num produto grande da Intelbras?<span class="kw">Lógica KMP, UI nativa</span></span></summary><div class="a"><p>KMP em <code>domain</code> e <code>data</code>, Compose no Android e SwiftUI no iOS. A arquitetura já permite: as telas só dependem de interfaces do domínio.</p></div></details>
+        <details class="q"><summary><span class="qtext">Quais as desvantagens do Compose no iOS?<span class="kw">Visual Material, binário maior</span></span></summary><div class="a"><p>Visual Material no iPhone e ajustes de layout (o banner em 390 pt), binário maior (runtime Kotlin e Skia), Gradle dentro do Xcode e regras de interop (<code>Int32</code>, sem valor padrão).</p></div></details>
+      </div>
+    </article>
+    <article class="stop searchable">
+      <div class="stop-head"><h3>VLC e o vídeo</h3></div>
+      <div class="qa">
+        <details class="q"><summary><span class="qtext">Com projetos nativos separados, o VLC continuaria necessário?<span class="kw">Sim: formato RTSP</span></span></summary><div class="a"><p>A necessidade vem do formato, não do KMP: RTSP com H.265 sem <code>fmtp</code>. O Media3 recusa o SDP e o AVPlayer não toca RTSP.</p></div></details>
+        <details class="q"><summary><span class="qtext">Quando o VLC deixa de ser necessário?<span class="kw">HLS ou HTTPS</span></span></summary><div class="a"><ul><li>Se a Intelbras entregar MP4/HLS por HTTPS (o Swagger promete): Media3 e AVPlayer tocam direto, com hardware.</li><li>Ou um backend na AWS reempacotar o RTSP em HLS ou WebRTC (Kinesis Video Streams, ou FFmpeg em ECS/EC2), com custo e latência.</li><li>Ganhos: APK menor, menos bateria, sem LGPL, PiP e AirPlay nativos.</li></ul></div></details>
+        <details class="q"><summary><span class="qtext">Trocar o player mexe no app?<span class="kw">Não: expect/actual</span></span></summary><div class="a"><p>Só <code>CameraPlayer.android.kt</code> e a implementação Swift de <code>NativeVideoPlayer</code>. Tela, ViewModel e domínio não mudam. Dá até para usar Media3 em HTTPS e VLC em RTSP.</p></div></details>
+      </div>
+    </article>
+    <article class="stop searchable" id="sdp">
+      <div class="stop-head"><h3>Onde entra o SDP sem fmtp</h3></div>
+      <p>O Postman (HTTPS) devolve <strong>só a URL</strong> <code>rtsp://</code>. O SDP vem depois, quando o player conversa com o servidor de vídeo da Imou:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Passo RTSP</th><th>O player pede</th><th>O servidor responde</th></tr></thead>
+          <tbody>
+            <tr><td><code>OPTIONS</code></td><td>"o que você aceita?"</td><td>a lista de comandos</td></tr>
+            <tr><td><code>DESCRIBE</code></td><td>"descreve o vídeo"</td><td><strong>o SDP</strong></td></tr>
+            <tr><td><code>SETUP</code></td><td>"prepara as faixas"</td><td>ok</td></tr>
+            <tr><td><code>PLAY</code></td><td>"começa"</td><td>pacotes RTP de vídeo e áudio</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <pre class="tree">m=video 0 RTP/AVP 98
+a=framerate:15.000000
+a=rtpmap:98 H265/90000
+m=audio 0 RTP/AVP 97
+a=rtpmap:97 MPEG4-GENERIC/16000</pre>
+      <p class="note">Medido em 07/10: <code>criar-fluxo-video</code> levou 4,4 s e o DESCRIBE 0,1 s. Não veio nenhuma linha <code>a=fmtp</code>.</p>
+      <div class="qa">
+        <details class="q"><summary><span class="qtext">O que o fmtp traria?<span class="kw">O manual do decodificador</span></span></summary><div class="a"><ul><li>O SDP é a etiqueta da caixa: vídeo H.265, áudio AAC.</li><li>O <code>fmtp</code> seria o manual de montagem: VPS/SPS/PPS do vídeo e o <code>config</code> do áudio.</li><li>No AAC (<code>MPEG4-GENERIC</code>), o padrão exige essa linha.</li></ul></div></details>
+        <details class="q"><summary><span class="qtext">E sem o fmtp, o que acontece?<span class="kw">Espera o quadro-chave</span></span></summary><div class="a"><p>O decodificador só começa quando os parâmetros chegam dentro do fluxo, junto com um quadro-chave. Isso explica parte da demora do 1º quadro a frio (22,6 s no Android, 39,2 s no iPhone). O resto vem da câmera acordando e da análise do VLC.</p></div></details>
+        <details class="q"><summary><span class="qtext">Por que isso decide o player?<span class="kw">Media3 recusa, VLC aceita</span></span></summary><div class="a"><p>O Media3 recusa o SDP ("missing attribute fmtp"), e o AVPlayer nem fala RTSP. Já o VLC lê os parâmetros de dentro do fluxo.</p></div></details>
+        <details class="q"><summary><span class="qtext">Como você viu o SDP?<span class="kw">DESCRIBE manual</span></span></summary><div class="a"><p>Mandei um DESCRIBE à mão logo depois de criar o fluxo no Postman. O <code>curl</code> do Mac só manda OPTIONS em RTSP. A sessão que ninguém abre cai rápido: deu 404 mesmo antes do <code>expire</code>.</p><pre class="tree">URL='COLE_A_URL'; printf 'DESCRIBE %s RTSP/1.0\r\nCSeq: 2\r\nAccept: application/sdp\r\n\r\n' "$URL" | nc -w 5 "$(echo "$URL" | cut -d/ -f3 | cut -d: -f1)" 8554</pre></div></details>
+        <details class="q"><summary><span class="qtext">O que é o "DH" no SDP?<span class="kw">Dahua (provável)</span></span></summary><div class="a"><p>A linha <code>a=packetization-supported:DH</code> sugere a Dahua, dona da marca Imou: o servidor de vídeo deve ser deles.</p></div></details>
+      </div>
+      <p class="say-it">"O Postman me dá a URL. O SDP vem depois, no DESCRIBE do RTSP. Ele não traz fmtp, então o decodificador espera os parâmetros chegarem dentro do fluxo. Isso descarta os players nativos e explica parte da demora."</p>
+    </article>
+    <article class="stop searchable">
+      <div class="stop-head"><h3>Por que o app oficial abre em menos de 2 s</h3></div>
+      <div class="qa">
+        <details class="q"><summary><span class="qtext">Por que o app oficial é mais rápido?<span class="kw">SDK + P2P (hipótese)</span></span></summary><div class="a"><ul><li>A GDI entrega o proxy RTSP da nuvem Imou para parceiros, que acorda a frio.</li><li>O app oficial provavelmente usa o SDK do fabricante: conexão já aberta (P2P ou relay aquecido), quadro-chave pedido na hora, decodificação por hardware, às vezes substream ou instantâneo como prévia.</li><li>As rotas de cota e sessões deram 403 "sem plano": o fluxo HTTPS do Swagger pode existir para contas com plano.</li></ul></div></details>
+        <details class="q"><summary><span class="qtext">Onde vão os ~3 s do nosso app a quente?<span class="kw">Sessão 2,4 s</span></span></summary><div class="a"><p><code>criar-fluxo-video</code> ~2,4 s medido, depois conexão RTSP ao proxy, buffer de 800 ms e espera do quadro-chave (o player para em 92%). Só a chamada de sessão já passa dos 2 s.</p></div></details>
+        <details class="q"><summary><span class="qtext">Como melhorar dentro da GDI?<span class="kw">Prefetch, reaproveitar URL</span></span></summary><div class="a"><ul><li>Pedir a sessão quando o card da câmera aparece na Home (custa cota: decisão de produto).</li><li>Reaproveitar a URL enquanto não expira.</li><li>Buffer adaptativo: menos em aparelho forte, 800 ms nos de entrada.</li><li>Abaixo de 2 s só com o caminho do app oficial.</li></ul></div></details>
+      </div>
+    </article>
+    <article class="stop searchable">
+      <div class="stop-head"><h3>Se o vídeo viesse por outro caminho</h3></div>
+      <div class="qa">
+        <details class="q"><summary><span class="qtext">Se o vídeo viesse por outro caminho, onde mudaria?<span class="kw">Dados + player</span></span></summary><div class="a"><p>Em duas portas isoladas: <code>DeviceProvider</code> (<code>startLive</code>/<code>stopLive</code>) nos dados e o <code>expect fun CameraPlayer</code> na tela (no iOS, via <code>NativeVideoPlayer</code> em Swift). ViewModel, listagem e fechadura não mudam.</p></div></details>
+        <details class="q"><summary><span class="qtext">Caminho do app oficial (SDK do fabricante, P2P)?<span class="kw">Generalizar StreamSession</span></span></summary><div class="a"><ul><li>Domínio: <code>StreamSession</code> vira tipo selado (por URL ou por SDK: id da câmera + credencial).</li><li>Dados: chamada nova para a credencial do SDK, no provider da GDI ou num novo <code>DeviceProvider</code>.</li><li>Android: o <code>actual</code> embrulha a view do SDK num <code>AndroidView</code>.</li><li>iOS: classe Swift nova implementando a mesma <code>NativeVideoPlayer</code>; o Kotlin nem sabe do SDK.</li><li>Tela: uma linha (passa a origem em vez de <code>it.streamUrl</code>). Dependências: entra o SDK, sai o VLC.</li><li>Ressalva: o SDK não é público; depende da Intelbras fornecer.</li></ul></div></details>
+        <details class="q"><summary><span class="qtext">E se a GDI passar a devolver HTTPS?<span class="kw">Só o player</span></span></summary><div class="a"><p>O <code>GdiApi</code> já lê <code>url</code>, <code>session_id</code>, <code>monitor_url</code> e <code>quota_gb</code>, e o encerramento de sessão já existe. Muda só o player: Media3 para <code>https</code> e libVLC para <code>rtsp</code> no Android; AVPlayer em Swift no iOS.</p></div></details>
+        <details class="q"><summary><span class="qtext">E se meu backend na AWS converter para HLS?<span class="kw">Novo provider + player</span></span></summary><div class="a"><p>Novo <code>DeviceProvider</code> (ou <code>baseUrl</code> do BFF) com autenticação Cognito, e player Media3/AVPlayer. Se for WebRTC, entram as bibliotecas WebRTC atrás do <code>expect</code>/<code>actual</code>.</p></div></details>
+      </div>
+      <p class="say-it">"A troca fica em duas pontas: dados (de onde vem o vídeo) e os actual do player (como tocar). HTTPS da Intelbras: só o player. SDK P2P do app oficial: também generalizo o StreamSession. ViewModel, listagem e fechadura não mudam; a tela de câmera muda no máximo uma linha."</p>
+    </article>
+    <article class="stop searchable">
+      <div class="stop-head"><h3>Pergunte à banca</h3></div>
+      <p class="say-it">"O app Mibo usa P2P com o SDK do fabricante ou o mesmo RTSP da GDI? E o fluxo HTTPS do Swagger, com session_id e cota, existe para contas com plano de vídeo? Na conta de teste essas rotas responderam 403."</p>
+      <p class="say-it">"A GDI entrega a segunda lente da iM4 Dual para parceiros? Testei canalVideo e channelId, 0 e 1, e as sessões simultâneas trouxeram os mesmos pacotes de vídeo."</p>
+      <p class="note">Não intercepte o tráfego do app deles para descobrir: pode violar os termos de uso.</p>
+    </article>
+  </section>
+
+  <!-- KOTLIN / COMPOSE -->
+  <section id="kotlin">
+    <div class="section-head">
+      <h2>Kotlin, Compose e corrotinas</h2>
+      <p>Respostas de uma linha, com o exemplo do projeto.</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Pergunta</th><th>Resposta</th></tr></thead>
+        <tbody>
+          <tr class="searchable"><td>sealed class / interface</td><td>Hierarquia fechada; o <code>when</code> fica exaustivo. <code>AppError</code>, <code>DevicesState</code>, <code>TokenValidation</code>, <code>LockCommand</code>.</td></tr>
+          <tr class="searchable"><td>data class</td><td>Igualdade por valor e <code>copy()</code>; estado imutável.</td></tr>
+          <tr class="searchable"><td>object</td><td>Singleton: <code>TokenFormat</code>, <code>GdiErrorMapper</code>.</td></tr>
+          <tr class="searchable"><td>suspend</td><td>Pode pausar sem bloquear a thread.</td></tr>
+          <tr class="searchable"><td>viewModelScope</td><td>Vive enquanto o ViewModel existe; cancelado no <code>onCleared</code>.</td></tr>
+          <tr class="searchable"><td>Flow × StateFlow</td><td><code>StateFlow</code> sempre tem valor atual: ideal para estado de tela.</td></tr>
+          <tr class="searchable"><td>Concorrência estruturada</td><td>Filhas morrem com o pai. <code>coroutineScope</code> + <code>async</code> nas leituras da fechadura.</td></tr>
+          <tr class="searchable"><td>CancellationException</td><td>Sempre relançada; senão o cancelamento vira um erro falso na tela.</td></tr>
+          <tr class="searchable"><td>Mutex</td><td>Exclusão mútua em corrotina, sem bloquear thread. Não é reentrante. <a href="#mutex">Detalhes abaixo</a>.</td></tr>
+          <tr class="searchable"><td>inline</td><td>Corpo copiado na chamada; <code>resultOf</code> aceita <code>suspend</code> dentro do bloco.</td></tr>
+          <tr class="searchable"><td>Nulidade</td><td><code>String?</code> obriga a tratar o nulo; evitei <code>!!</code>.</td></tr>
+          <tr class="searchable"><td>Extensão</td><td>Função "pendurada" num tipo sem herdar: <code>Device.gdiApiNs</code>.</td></tr>
+          <tr class="searchable"><td>Recomposição</td><td>O Compose redesenha só o que leu um estado que mudou.</td></tr>
+          <tr class="searchable"><td>State hoisting</td><td>Estado sobe para o ViewModel; a tela recebe valores e devolve eventos.</td></tr>
+          <tr class="searchable"><td>Modifier</td><td>Encadeia tamanho, layout, clique e aparência; a ordem importa.</td></tr>
+          <tr class="searchable"><td>collectAsStateWithLifecycle</td><td>Coleta o <code>StateFlow</code> só com a tela visível.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <article class="stop searchable" id="mutex">
+      <div class="stop-head"><h3>Mutex no projeto</h3></div>
+      <p><strong>Mutex</strong> = <em>mutual exclusion</em> (exclusão mútua). É a chave do banheiro: só uma corrotina por vez entra no <code>withLock { }</code>. As outras esperam na fila <strong>suspensas</strong>, sem travar a thread, ao contrário do <code>synchronized</code>. Funciona no <code>commonMain</code> (Android e iOS).</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Onde</th><th>Sem Mutex</th><th>Com Mutex</th></tr></thead>
+          <tbody>
+            <tr><td><code>GdiApi.renewLock</code><br>renovação do token</td><td>3 leituras paralelas recebem 401 e fazem 3 renovações. A 1ª invalida o token antigo, as outras recebem 400 e a tela mostra erro.</td><td>A 1ª renova. As outras veem que o token mudou e só repetem a chamada.<br><code>parallelExpiredCallsRenewTheTokenOnlyOnce</code></td></tr>
+            <tr><td><code>DeviceRepositoryImpl.loading</code><br>lista de dispositivos</td><td>Atualizar e carregar mais escrevem a lista ao mesmo tempo: a página 2 antiga acaba colada na lista nova.</td><td>Um carregamento de cada vez escreve o estado.<br><code>firstPageWhileLoadMoreInFlight…</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <pre class="tree">renewLock.withLock {
+    val latest = tokens.token.value ?: throw GdiNoTokenException()
+    if (latest != failed) latest else renewLocked() // já renovaram? só reaproveita
+}</pre>
+      <div class="qa">
+        <details class="q"><summary><span class="qtext">O Mutex garante que a resposta mais recente vence?<span class="kw">Não: geração</span></span></summary><div class="a"><ul><li>O Mutex garante só "um de cada vez".</li><li><strong>Contador de geração:</strong> cada atualização ou troca de filtro ganha um número novo. A resposta de uma geração antiga não é publicada: <code>if (gen == generation.value) publish(next)</code>.</li><li><strong>Jobs separados:</strong> trocar o filtro cancela a chamada lenta, em vez de esperar até 20 s na fila do Mutex.</li></ul></div></details>
+        <details class="q"><summary><span class="qtext">O Mutex é reentrante?<span class="kw">Não: deadlock</span></span></summary><div class="a"><p>Se a mesma corrotina chamar <code>withLock</code> dentro de outro <code>withLock</code>, ela trava para sempre. Por isso existe o <code>renewLocked()</code>, a versão para quem já está com a chave.</p></div></details>
+        <details class="q"><summary><span class="qtext">Por que não <code>synchronized</code>?<span class="kw">Bloqueia a thread</span></span></summary><div class="a"><p><code>synchronized</code> e <code>ReentrantLock</code> bloqueiam a thread e são do Java, então não servem no código comum com iOS. O Mutex suspende a corrotina e libera a thread.</p></div></details>
+      </div>
+      <p class="say-it">"Mutex é exclusão mútua para corrotinas: uma por vez no bloco, e as outras suspendem sem travar a thread. Uso em dois lugares. Na renovação do token, para que vários 401 em paralelo façam uma renovação só. E no carregamento da lista, para que atualizar e carregar mais não escrevam juntos. Junto com ele, um contador de geração descarta resposta velha."</p>
+    </article>
+    <article class="stop searchable" id="koin">
+      <div class="stop-head"><h3>Koin: a injeção de dependência</h3></div>
+      <p>Injeção de dependência é <strong>não deixar a classe construir o que ela usa</strong>: o <code>HomeViewModel</code> pede um <code>DeviceRepository</code> no construtor e alguém de fora entrega. O Koin é esse alguém: um registro que sabe criar cada peça.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Parte</th><th>Onde</th><th>O que faz</th></tr></thead>
+          <tbody>
+            <tr><td>Registro</td><td><code>di/Koin.kt</code> (<code>appModule</code>)</td><td>Raiz de composição: o único arquivo que conhece <code>domain</code>, <code>data</code> e <code>ui</code>. Cada linha diz "quando pedirem X, entregue Y", sempre pela <strong>interface</strong>: <code>single&lt;TokenRepository&gt; { TokenRepositoryImpl(storage = get(), …) }</code>.</td></tr>
+            <tr><td>Nativo</td><td><code>expect val platformModule</code></td><td>Android registra o Keystore (precisa de <code>androidContext()</code>); iOS registra o Keychain. Quem pede <code>TokenStorage</code> não sabe qual veio.</td></tr>
+            <tr><td>Partida</td><td><code>initKoin</code></td><td>Android: <code>CasaApplication.java</code> chama <code>KoinKt.initKoin</code> com o <code>Context</code>. iOS: <code>KoinKt.doInitKoin()</code> (versão sem parâmetro, porque o Swift não vê valor padrão). A UI só toca o Koin em <code>koinViewModel&lt;HomeViewModel&gt;()</code>.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Escopo</th><th>Quando</th><th>No projeto</th></tr></thead>
+          <tbody>
+            <tr><td><code>single</code></td><td>Uma instância para o app inteiro</td><td><code>GdiApi</code>, repositórios, <code>DeviceProvider</code> (com <code>named("gdi")</code>; o repositório recebe todos via <code>getAll()</code>)</td></tr>
+            <tr><td><code>factory</code></td><td>Instância nova a cada pedido</td><td>Os dois casos de uso, sem estado</td></tr>
+            <tr><td><code>viewModel</code></td><td>Uma por tela, morre com ela</td><td><code>viewModelOf(::HomeViewModel)</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="qa">
+        <details class="q"><summary><span class="qtext">Por que Koin e não Hilt?<span class="kw">Hilt é só Android</span></span></summary><div class="a"><p>O Hilt gera código com o processador do Dagger, que não existe para iOS. O Koin é Kotlin puro, resolve em tempo de execução e roda no <code>commonMain</code>. Custo: erro de registro aparece ao rodar, não ao compilar; por isso o Koin inicia na <code>Application</code> e o roteiro de aparelho cobre a abertura.</p></div></details>
+        <details class="q"><summary><span class="qtext">Os testes usam Koin?<span class="kw">Não: fakes no construtor</span></span></summary><div class="a"><p>Os 91 testes constroem as classes na mão: <code>HomeViewModel(fakeRepo, fakeTokens, …)</code>. O Koin só liga as peças em produção. Se a classe criasse o <code>GdiApi</code> por dentro, o teste não conseguiria substituir.</p></div></details>
+        <details class="q"><summary><span class="qtext">E com várias telas?<span class="kw">Um ViewModel por tela</span></span></summary><div class="a"><ul>
+          <li>Um <code>viewModelOf</code> por ViewModel; os <code>single</code> continuam compartilhados.</li>
+          <li><code>koinViewModel</code> chamado <strong>dentro</strong> do <code>composable&lt;Rota&gt;</code>: o dono é a entrada da pilha, então nasce com a tela, sobrevive à rotação e morre quando ela sai.</li>
+          <li>Parâmetro de rota (o <code>ns</code>): pelo <code>SavedStateHandle</code> (<code>handle.toRoute&lt;CameraRoute&gt;().ns</code>) ou por <code>parametersOf(ns)</code>.</li>
+          <li>Estado que atravessa telas fica no repositório (<code>single</code>), nunca em ViewModel; dois ViewModels se falam pelo repositório.</li>
+          <li>Em módulos Gradle por feature, cada um traz o seu módulo Koin e a raiz só junta.</li>
+          <li>No case: dividiria em 4 (token, home, câmera, fechadura/hub); o <code>lockCommand</code> iria inteiro para o <code>LockViewModel</code>.</li></ul></div></details>
+        <details class="q"><summary><span class="qtext">Como entraria uma tela nova, um Perfil?<span class="kw">Rota, VM, 1 linha no Koin, tela, NavHost</span></span></summary><div class="a">
+          <p>Perfil = conta conectada: token mascarado, se está no cofre, parceiro, total de aparelhos e Sair. Tudo já existe nos repositórios.</p>
+          <ol class="say">
+            <li><strong>Rota:</strong> <code>@Serializable object PerfilRoute</code> em <code>App.kt</code>.</li>
+            <li><strong>ViewModel:</strong> só pede interfaces do domínio.</li>
+            <li><strong>Koin:</strong> <code>viewModelOf(::PerfilViewModel)</code>.</li>
+            <li><strong>Tela:</strong> desenha o estado e devolve eventos (<code>onBack</code>, <code>onLogout</code>).</li>
+            <li><strong>NavHost:</strong> <code>composable&lt;PerfilRoute&gt;</code> com <code>koinViewModel&lt;PerfilViewModel&gt;()</code> dentro.</li>
+          </ol>
+          <pre class="tree">class PerfilViewModel(private val tokens: TokenRepository, private val devices: DeviceRepository) : ViewModel() {
+    val state: StateFlow&lt;PerfilState&gt; = combine(tokens.token, devices.devices) { _, lista -&gt;
+        PerfilState(tokens.masked(), tokens.persisted, devices.providerNames, lista.size)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), PerfilState.vazio)
+    fun sair() = devices.logout()
+}</pre>
+          <p><strong>O que não muda:</strong> <code>GdiApi</code>, os <code>…Impl</code>, o <code>HomeViewModel</code> e as outras telas. <strong>Teste:</strong> <code>PerfilViewModel(fakeTokens, fakeDevices)</code> e conferir token mascarado e contagem, sem Koin.</p>
+          <p>Se precisasse de rota nova na API: modelo no <code>domain</code> → método na interface do repositório → função no <code>GdiApi</code> → implementação no <code>…Impl</code>; o Koin só muda se nascer uma classe nova.</p>
+        </div></details>
+      </div>
+      <p class="say-it">"Koin é o registro que liga interface a implementação. Um módulo comum registra API, repositórios, parceiros e casos de uso; um módulo por plataforma registra o cofre do token. O ViewModel só declara o que precisa no construtor. Nos testes nem uso Koin: passo fakes direto. Hilt não roda no iOS, por isso Koin."</p>
+      <p class="say-it">"Tela nova é rota, ViewModel, uma linha no Koin, o Composable e o composable no NavHost. O ViewModel só pede interfaces do domínio, então nada da camada de dados muda, e o teste passa fakes direto no construtor."</p>
+    </article>
+    <article class="stop searchable" id="expect-actual">
+      <div class="stop-head"><h3>expect/actual no projeto</h3></div>
+      <p><code>expect</code> é uma <strong>promessa</strong> feita no código comum: "existe uma função ou valor com esta assinatura". Cada plataforma cumpre com um <code>actual</code>, e o compilador <strong>obriga</strong> que Android e iOS tenham o seu. O comum chama a promessa sem saber quem está por trás.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th><code>expect</code> (commonMain)</th><th>Android (<code>.android.kt</code>)</th><th>iOS (<code>.ios.kt</code>)</th></tr></thead>
+          <tbody>
+            <tr><td><code>val isDebugBuild</code></td><td>Lê <code>FLAG_DEBUGGABLE</code> do app hospedeiro: biblioteca KMP não tem <code>BuildConfig</code></td><td><code>Platform.isDebugBinary</code>: o binário sabe se foi ligado em Debug</td></tr>
+            <tr><td><code>val platformModule</code></td><td>Registra <code>KeystoreTokenStorage(androidContext())</code></td><td>Registra <code>KeychainTokenStorage()</code></td></tr>
+            <tr><td><code>weekStrip()</code>, <code>todayMonthDay()</code>, <code>todayDayMonth()</code></td><td><code>java.time</code> (minSdk 26)</td><td><code>NSCalendar</code> e <code>NSDateFormatter</code></td></tr>
+            <tr><td><code>@Composable fun CameraPlayer(…)</code></td><td><code>AndroidView</code> com libVLC</td><td><code>UIKitView</code> com a view que o Swift entrega</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="qa">
+        <details class="q"><summary><span class="qtext">Onde fica a lógica?<span class="kw">No comum; actual fino</span></span></summary><div class="a"><p>A faixa da semana é o exemplo: a regra (hoje−6 até amanhã, iniciais em português, marcar hoje) está na função pura <code>buildWeekStrip</code>, no comum. O <code>actual</code> só responde "dia do mês no deslocamento X" e "dia da semana ISO". Assim a regra é testada no comum com um calendário falso (<code>MiboLogicTest</code>), e o <code>actual</code> do iOS cuida só das armadilhas: <code>NSCalendar</code> numera domingo como 1, e o locale <code>en_US_POSIX</code> impede a preferência regional do iPhone de mudar o formato.</p></div></details>
+        <details class="q"><summary><span class="qtext">Como o vídeo chega ao Swift?<span class="kw">expect → actual → Swift</span></span></summary><div class="a"><p>O Kotlin/Native não enxerga um pacote Swift (o VLCKit vem por SPM). Então o <code>actual</code> do iOS não tem VLC: ele declara a interface Kotlin <code>NativeVideoPlayer</code>, o Swift a implementa em <code>VLCVideoPlayer.swift</code>, e o app registra a fábrica na partida (<code>NativePlayers.shared.factory = VLCVideoPlayerFactory()</code>). O <code>actual</code> cria o player pela fábrica, entrega um <code>listener</code> Kotlin para o Swift chamar de volta e põe a <code>UIView</code> num <code>UIKitView</code>.</p></div></details>
+        <details class="q"><summary><span class="qtext">expect/actual ou interface + Koin?<span class="kw">Trocar? Interface. Existir? expect</span></span></summary><div class="a"><ul>
+          <li><strong>expect/actual:</strong> quando a coisa precisa existir em cada plataforma e não há o que trocar em tempo de execução: flag de debug, calendário, player.</li>
+          <li><strong>Interface + injeção:</strong> quando quero trocar a implementação, sobretudo por um fake nos testes. O <code>TokenStorage</code> é interface do domínio, não <code>expect</code>: o <code>platformModule</code> registra Keystore ou Keychain, e nos testes entra um <code>FakeTokenStorage</code>.</li>
+          <li>O <code>platformModule</code> é o <code>expect</code> que faz a ponte entre os dois mundos.</li></ul></div></details>
+        <details class="q"><summary><span class="qtext">Armadilhas?<span class="kw">Padrão só no expect</span></span></summary><div class="a"><ul>
+          <li>Valor padrão só no <code>expect</code>; o <code>actual</code> repete a assinatura sem <code>= Modifier</code>.</li>
+          <li><code>actual val</code> com <code>get()</code>: <code>isDebugBuild</code> é calculado a cada leitura.</li>
+          <li>Preview da IDE: ler a flag no Android passa pelo Koin; sem Koin iniciado lançaria, por isso <code>runCatching</code> com <code>false</code>.</li>
+          <li><code>@OptIn(ExperimentalNativeApi)</code> no <code>Platform.isDebugBinary</code>.</li></ul></div></details>
+      </div>
+      <p class="say-it">"expect é a promessa no comum, actual é cada plataforma cumprindo, e o compilador cobra os dois. Tenho quatro: flag de debug, módulo Koin com o cofre do token, calendário e o player de vídeo. Mantenho o actual fino e a regra no comum, testada com fake. Quando quero trocar implementação ou usar fake, prefiro interface com injeção, como no TokenStorage."</p>
+    </article>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Biblioteca</th><th>Para quê</th></tr></thead>
+        <tbody>
+          <tr class="searchable"><td>Ktor</td><td>HTTP. Engine OkHttp (Android), Darwin (iOS), Mock (testes). Sem plugin Logging.</td></tr>
+          <tr class="searchable"><td>Koin</td><td>Injeção de dependência no código comum.</td></tr>
+          <tr class="searchable"><td>kotlinx.coroutines</td><td>Flow, StateFlow, Mutex, escopos.</td></tr>
+          <tr class="searchable"><td>kotlinx.serialization</td><td>Corpo JSON e rotas tipadas da navegação.</td></tr>
+          <tr class="searchable"><td>Lifecycle / Navigation (JetBrains)</td><td>ViewModel, collectAsStateWithLifecycle e NavHost multiplataforma.</td></tr>
+          <tr class="searchable"><td>Material 3</td><td>Componentes visuais.</td></tr>
+          <tr class="searchable"><td>libVLC / VLCKit</td><td>Vídeo RTSP no Android / iOS.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- KMP -->
+  <section id="kmp">
+    <div class="section-head">
+      <h2>KMP: o que tem dentro</h2>
+      <p>Regra, dados e telas no comum; nas plataformas, só o nativo.</p>
+    </div>
+<pre class="tree">shared/src/
+├─ commonMain/   ~90% do app
+│   ├─ App.kt              tema + rotas tipadas + NavHost
+│   ├─ di/Koin.kt          interface → implementação; expect platformModule
+│   ├─ domain/             modelos, AppError, interfaces, 2 casos de uso
+│   ├─ data/ + data/gdi/   repositórios, GdiApi (Ktor), parser, erros
+│   ├─ ui/                 HomeViewModel + telas Compose + FitText
+│   ├─ player/             expect fun CameraPlayer(...)
+│   └─ platform/           expect: isDebugBuild, calendário
+├─ androidMain/  Keystore, libVLC (AndroidView), java.time
+├─ iosMain/      MainViewController, Keychain (cinterop),
+│                CameraPlayer.ios + NativeVideoPlayer (interface)
+└─ commonTest/   91 testes (JVM + simulador iOS)
+androidApp/  CasaApplication.java, MainActivity, teste JUnit Java
+iosApp/      iOSApp.swift, ContentView.swift, VLCVideoPlayer.swift</pre>
+    <details class="group searchable" open>
+      <summary>Os 4 usos de expect/actual</summary>
+      <dl class="terms">
+        <div><dt>platformModule</dt><dd>Koin de cada plataforma: Keystore ou Keychain.</dd></div>
+        <div><dt>isDebugBuild</dt><dd>Detalhe técnico do erro só em debug.</dd></div>
+        <div><dt>weekStrip()</dt><dd>Calendário com <code>java.time</code> ou <code>NSCalendar</code>.</dd></div>
+        <div><dt>CameraPlayer</dt><dd>libVLC no Android; no iOS a view vem do Swift (VLCKit).</dd></div>
+        <div><dt>→</dt><dd><a href="#expect-actual">Como funciona, onde fica a lógica e as armadilhas</a>.</dd></div>
+      </dl>
+    </details>
+    <details class="group searchable">
+      <summary>Como cada plataforma é montada</summary>
+      <dl class="terms">
+        <div><dt>Android</dt><dd>O <code>shared</code> vira bytecode JVM; a <code>MainActivity</code> chama <code>setContent { App() }</code>.</dd></div>
+        <div><dt>iOS</dt><dd>Kotlin/Native compila o framework estático <code>Shared</code>. No Xcode, "Compile Kotlin Framework" roda <code>embedAndSignAppleFrameworkForXcode</code> antes do Swift, que faz <code>import Shared</code>.</dd></div>
+        <div><dt>Export Swift</dt><dd>Função de topo → <code>ArquivoKt.funcao()</code>; <code>object</code> → <code>.shared</code>; <code>Int</code> → <code>Int32</code>; <code>init…</code> → <code>doInit…</code>.</dd></div>
+      </dl>
+    </details>
+  </section>
+
+  <!-- SIGLAS -->
+  <section id="siglas">
+    <div class="section-head">
+      <h2>Siglas</h2>
+      <p>Use a busca para achar uma rapidamente.</p>
+    </div>
+    <details class="group">
+      <summary>Projeto e arquitetura</summary>
+      <dl class="terms">
+        <div class="searchable"><dt>RF</dt><dd>Requisito Funcional (RF01–RF09).</dd></div>
+        <div class="searchable"><dt>SDD</dt><dd>Spec-Driven Development: desenvolvimento orientado por especificação.</dd></div>
+        <div class="searchable"><dt>KMP</dt><dd>Kotlin Multiplatform.</dd></div>
+        <div class="searchable"><dt>CMP</dt><dd>Compose Multiplatform.</dd></div>
+        <div class="searchable"><dt>K/N</dt><dd>Kotlin/Native: Kotlin compilado para nativo (iOS).</dd></div>
+        <div class="searchable"><dt>MVVM</dt><dd>Model-View-ViewModel.</dd></div>
+        <div class="searchable"><dt>DI</dt><dd>Dependency Injection (Koin).</dd></div>
+        <div class="searchable"><dt>UI / UX</dt><dd>User Interface / User Experience.</dd></div>
+        <div class="searchable"><dt>CI</dt><dd>Continuous Integration (GitHub Actions).</dd></div>
+        <div class="searchable"><dt>IA</dt><dd>Inteligência Artificial.</dd></div>
+      </dl>
+    </details>
+    <details class="group">
+      <summary>Android, iOS e ferramentas</summary>
+      <dl class="terms">
+        <div class="searchable"><dt>JVM / JDK</dt><dd>Java Virtual Machine / Java Development Kit.</dd></div>
+        <div class="searchable"><dt>JBR</dt><dd>JetBrains Runtime: o JDK do Android Studio.</dd></div>
+        <div class="searchable"><dt>AGP</dt><dd>Android Gradle Plugin.</dd></div>
+        <div class="searchable"><dt>SDK / IDE</dt><dd>Software Development Kit / Integrated Development Environment.</dd></div>
+        <div class="searchable"><dt>APK / AAB</dt><dd>Android Package / Android App Bundle.</dd></div>
+        <div class="searchable"><dt>ABI</dt><dd>Application Binary Interface: arquitetura do processador.</dd></div>
+        <div class="searchable"><dt>ANR</dt><dd>Application Not Responding: thread principal travada.</dd></div>
+        <div class="searchable"><dt>FAB</dt><dd>Floating Action Button.</dd></div>
+        <div class="searchable"><dt>dp / sp / pt</dt><dd>Medidas de tela e texto (Android) / ponto (iOS).</dd></div>
+        <div class="searchable"><dt>SPM</dt><dd>Swift Package Manager (VLCKit).</dd></div>
+        <div class="searchable"><dt>CF</dt><dd>CoreFoundation: API em C da Apple usada no Keychain.</dd></div>
+        <div class="searchable"><dt>UDID</dt><dd>Unique Device Identifier do iPhone.</dd></div>
+      </dl>
+    </details>
+    <details class="group">
+      <summary>API, rede e vídeo</summary>
+      <dl class="terms">
+        <div class="searchable"><dt>API</dt><dd>Application Programming Interface.</dd></div>
+        <div class="searchable"><dt>GDI</dt><dd>Nome da API da plataforma Casa Inteligente (a Intelbras não expande a sigla).</dd></div>
+        <div class="searchable"><dt>HTTP(S)</dt><dd>HyperText Transfer Protocol (Secure).</dd></div>
+        <div class="searchable"><dt>JSON</dt><dd>JavaScript Object Notation.</dd></div>
+        <div class="searchable"><dt>ns</dt><dd>Número de série do dispositivo.</dd></div>
+        <div class="searchable"><dt>RTSP</dt><dd>Real Time Streaming Protocol: o vídeo ao vivo.</dd></div>
+        <div class="searchable"><dt>SDP</dt><dd>Session Description Protocol: descrição da sessão de vídeo.</dd></div>
+        <div class="searchable"><dt>fmtp</dt><dd>Format parameters: linha do SDP com os parâmetros do decodificador. Falta na Intelbras.</dd></div>
+        <div class="searchable"><dt>DESCRIBE</dt><dd>Comando RTSP que pede o SDP. Vem depois da URL, sem passar pelo Postman.</dd></div>
+        <div class="searchable"><dt>RTP</dt><dd>Real-time Transport Protocol: os pacotes de vídeo e áudio que chegam depois do PLAY.</dd></div>
+        <div class="searchable"><dt>VPS / SPS / PPS</dt><dd>Video / Sequence / Picture Parameter Set: parâmetros que o decodificador H.265 precisa para começar.</dd></div>
+        <div class="searchable"><dt>IDR</dt><dd>Instantaneous Decoder Refresh: o quadro-chave. Os parâmetros chegam junto com ele.</dd></div>
+        <div class="searchable"><dt>H.265 / HEVC</dt><dd>High Efficiency Video Coding.</dd></div>
+        <div class="searchable"><dt>AAC</dt><dd>Advanced Audio Coding (áudio desligado).</dd></div>
+        <div class="searchable"><dt>VLC</dt><dd>VideoLAN Client (libVLC, VLCKit).</dd></div>
+        <div class="searchable"><dt>PTZ</dt><dd>Pan-Tilt-Zoom (não existe na API).</dd></div>
+        <div class="searchable"><dt>OSD</dt><dd>On-Screen Display: data e logo gravados pela câmera.</dd></div>
+        <div class="searchable"><dt>400 / 401 / 403 / 404 / 500</dt><dd>Pedido inválido (renovar expirado) / token inválido / token expirado / ns errado / erro do servidor (volume).</dd></div>
+      </dl>
+    </details>
+    <details class="group">
+      <summary>Backend e streaming</summary>
+      <dl class="terms">
+        <div class="searchable"><dt>P2P</dt><dd>Peer-to-peer (ponto a ponto): o celular conecta direto à câmera; a nuvem só ajuda no "encontro".</dd></div>
+        <div class="searchable"><dt>NAT</dt><dd>Network Address Translation: o roteador de casa esconde a câmera da internet; é o obstáculo que o P2P atravessa.</dd></div>
+        <div class="searchable"><dt>STUN / TURN</dt><dd>Servidores que ajudam a abrir o caminho direto (STUN) ou retransmitem quando não dá (TURN).</dd></div>
+        <div class="searchable"><dt>HLS / LL-HLS</dt><dd>HTTP Live Streaming (Apple): vídeo em pedaços por HTTPS; atraso de 6–30 s (LL-HLS ~2–3 s).</dd></div>
+        <div class="searchable"><dt>WebRTC</dt><dd>Web Real-Time Communication: vídeo ponto a ponto com menos de 1 s de atraso.</dd></div>
+        <div class="searchable"><dt>BFF</dt><dd>Backend for Frontend: backend próprio entre o app e a API de terceiros.</dd></div>
+        <div class="searchable"><dt>OAuth</dt><dd>Padrão de login e autorização por token (usado pelo Cognito).</dd></div>
+        <div class="searchable"><dt>SNS</dt><dd>Simple Notification Service (AWS): dispara push.</dd></div>
+        <div class="searchable"><dt>FCM / APNs</dt><dd>Firebase Cloud Messaging (Android) / Apple Push Notification service (iOS).</dd></div>
+        <div class="searchable"><dt>PiP</dt><dd>Picture-in-Picture: vídeo em janela flutuante.</dd></div>
+      </dl>
+    </details>
+    <details class="group">
+      <summary>Segurança e licença</summary>
+      <dl class="terms">
+        <div class="searchable"><dt>AES</dt><dd>Advanced Encryption Standard.</dd></div>
+        <div class="searchable"><dt>GCM</dt><dd>Galois/Counter Mode: cifra e garante integridade.</dd></div>
+        <div class="searchable"><dt>IV</dt><dd>Initialization Vector: valor aleatório por cifragem.</dd></div>
+        <div class="searchable"><dt>LGPL</dt><dd>GNU Lesser General Public License (libVLC, VLCKit).</dd></div>
+      </dl>
+    </details>
+  </section>
+
+  <!-- CHECKLIST -->
+  <section id="checklist">
+    <div class="section-head">
+      <h2>Checklist do dia</h2>
+      <p>As marcações ficam salvas só neste aparelho.</p>
+    </div>
+    <ul class="checklist" id="check">
+      <li><label><input type="checkbox" id="c1"><span>Push feito e repositório público (ou avaliadores convidados).</span></label></li>
+      <li><label><input type="checkbox" id="c2"><span>README e PDF alinhados: RF05 abrir/fechar testado no iPhone.</span></label></li>
+      <li><label><input type="checkbox" id="c3"><span>Token novo gerado ~15 min antes (vale ~2 h).</span></label></li>
+      <li><label><input type="checkbox" id="c4"><span>Câmera aquecida: abrir o vídeo uma vez antes.</span></label></li>
+      <li><label><input type="checkbox" id="c5"><span>Espelhamento testado: Running Devices (Android Studio) e Espelhamento do iPhone ou QuickTime.</span></label></li>
+      <li><label><input type="checkbox" id="c6"><span>Aparelhos carregados, sem modo avião nem Não perturbe.</span></label></li>
+      <li><label><input type="checkbox" id="c7"><span>IDE aberta com os 5 arquivos em abas; PDF e README à mão.</span></label></li>
+      <li><label><input type="checkbox" id="c8"><span>Plano B: vídeo curto da demonstração gravado.</span></label></li>
+    </ul>
+  </section>
+</div>
+
+<script>
+(function () {
+  // Busca: mostra só os itens que contêm o texto e abre as respostas encontradas.
+  var busca = document.getElementById('busca');
+  var vazio = document.getElementById('sem-resultado');
+  var itens = Array.prototype.slice.call(document.querySelectorAll('.searchable'));
+  var grupos = Array.prototype.slice.call(document.querySelectorAll('details.group'));
+  function normal(s) { return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, ''); }
+  busca.addEventListener('input', function () {
+    var q = normal(busca.value.trim());
+    var achou = 0;
+    itens.forEach(function (el) {
+      var ok = !q || normal(el.textContent).indexOf(q) !== -1;
+      el.hidden = !ok;
+      if (ok) achou++;
+      if (q && ok) el.querySelectorAll('details').forEach(function (d) { d.open = true; });
+    });
+    grupos.forEach(function (g) {
+      // Grupos que são eles mesmos um item já foram tratados acima.
+      if (g.classList.contains('searchable')) return;
+      var visiveis = g.querySelectorAll('.searchable:not([hidden])').length;
+      g.hidden = !!q && visiveis === 0;
+      if (q) g.open = visiveis > 0;
+    });
+    vazio.hidden = !q || achou > 0;
+  });
+
+  // Abrir ou fechar todas as respostas.
+  var abrir = document.getElementById('abrir');
+  var aberto = false;
+  abrir.addEventListener('click', function () {
+    aberto = !aberto;
+    document.querySelectorAll('details.q').forEach(function (d) { d.open = aberto; });
+    abrir.textContent = aberto ? 'Fechar todas as respostas' : 'Abrir todas as respostas';
+  });
+
+  // Cronômetro de 20 minutos com o bloco atual destacado.
+  var TOTAL = 20 * 60;
+  var clock = document.getElementById('clock');
+  var sub = document.getElementById('clock-sub');
+  var bar = document.getElementById('bar');
+  var start = document.getElementById('start');
+  var reset = document.getElementById('reset');
+  var blocks = Array.prototype.slice.call(document.querySelectorAll('#blocks li'));
+  var elapsed = 0, runningSince = null, tick = null, lock = null;
+  function fmt(s) { s = Math.max(0, Math.round(s)); var m = Math.floor(s / 60), r = s % 60; return m + ':' + (r < 10 ? '0' : '') + r; }
+  function now() { return elapsed + (runningSince ? (Date.now() - runningSince) / 1000 : 0); }
+  function render() {
+    var t = Math.min(now(), TOTAL);
+    clock.textContent = fmt(TOTAL - t);
+    bar.style.width = (t / TOTAL * 100) + '%';
+    var atual = null;
+    blocks.forEach(function (li) {
+      var from = +li.dataset.from, to = +li.dataset.to;
+      li.classList.toggle('now', t >= from && t < to && (runningSince || t > 0));
+      li.classList.toggle('done', t >= to);
+      if (t >= from && t < to) atual = li;
+    });
+    if (t >= TOTAL) { sub.textContent = 'Tempo esgotado: hora das perguntas'; pause(); }
+    else if (runningSince || t > 0) { sub.textContent = 'Agora: ' + (atual ? atual.querySelector('b').textContent : '') + ' · ' + fmt(t) + ' decorridos'; }
+    else { sub.textContent = 'Pronto para começar'; }
+  }
+  function keepAwake() {
+    try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (l) { lock = l; }).catch(function () {}); } catch (e) {}
+  }
+  function play() { runningSince = Date.now(); tick = setInterval(render, 250); start.textContent = 'Pausar'; keepAwake(); render(); }
+  function pause() {
+    if (runningSince) { elapsed += (Date.now() - runningSince) / 1000; runningSince = null; }
+    clearInterval(tick); start.textContent = elapsed >= TOTAL ? 'Iniciar' : (elapsed > 0 ? 'Continuar' : 'Iniciar');
+    try { if (lock) { lock.release(); lock = null; } } catch (e) {}
+  }
+  start.addEventListener('click', function () { if (runningSince) pause(); else { if (elapsed >= TOTAL) elapsed = 0; play(); } });
+  reset.addEventListener('click', function () { pause(); elapsed = 0; start.textContent = 'Iniciar'; render(); });
+  render();
+
+  // Checklist salvo só neste navegador.
+  document.querySelectorAll('#check input').forEach(function (box) {
+    try { box.checked = localStorage.getItem('cola-' + box.id) === '1'; } catch (e) {}
+    box.addEventListener('change', function () {
+      try { localStorage.setItem('cola-' + box.id, box.checked ? '1' : '0'); } catch (e) {}
+    });
+  });
+})();
+</script>
+</body>
+</html>

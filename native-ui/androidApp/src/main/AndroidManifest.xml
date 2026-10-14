@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- allowBackup=false: o token cifrado não vai para backup em nuvem nem para outro aparelho
+         (a chave do Keystore não migra; o dado restaurado seria lixo). -->
+    <!-- Nomes de classe completos: o namespace do módulo é br.com.pompeo.casa.nativeui (só para R e BuildConfig),
+         mas Application e Activity ficam em br.com.pompeo.casa, como na raiz. -->
+    <application
+        android:name="br.com.pompeo.casa.CasaApplication"
+        android:allowBackup="false"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@android:style/Theme.Material.Light.NoActionBar">
+        <!-- adjustResize: o teclado redimensiona a tela, importante no campo de token. -->
+        <activity
+            android:name="br.com.pompeo.casa.MainActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+
+</manifest>

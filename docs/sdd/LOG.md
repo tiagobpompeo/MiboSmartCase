@@ -39,3 +39,26 @@ Seis auditores conferiram cada requisito do case (RF01–RF09, entregáveis e ei
 - Nenhum comando físico (abrir, fechar, mudar volume) foi enviado à fechadura real: a ação é sobre equipamento de terceiros e depende de autorização explícita do dono da conta. Esses caminhos são cobertos por testes com a forma de resposta documentada.
 - O token da conta de teste nunca foi impresso, versionado nem incluído nesta documentação; as chamadas de diagnóstico à API real leram o valor de `local.properties` sem exibi-lo.
 - Push, visibilidade do repositório e envio do e-mail ficaram com o autor.
+
+## 6. Modularização (14/10/2026)
+
+Depois do case entregue, o projeto foi dividido em módulos Gradle sem mudar o comportamento do app: `core/domain`, `core/data`, `core/ui`, `core/player`, `core/testing`, `feature/token`, `feature/home`, `feature/camera`, `feature/device` e o umbrella `shared`, com plugins de convenção em `build-logic/` (padrão Now in Android, adaptado a KMP). Como foi feito e verificado:
+
+| Etapa | O que foi feito | Como foi verificado |
+|---|---|---|
+| Mapa de dependências | Antes de mover qualquer arquivo, um script listou os `import` entre pacotes: `ui` → `domain`, `platform`, `player`; `data` → `domain`; `di` → tudo. O mapa virou o grafo de módulos. | Grafo sem ciclo; `domain` sem importar ninguém. |
+| Esqueleto | `build-logic` com `casa.kmp.library` e `casa.kmp.compose`; `settings.gradle.kts` com `includeBuild` e os nove módulos; código movido por pacote (sem mudar nomes de pacote nos módulos `core`, para o diff ficar legível); `Koin.kt` dividido em `dataModule`/`platformModule` (`core/data`) e o agregador do umbrella. | `core/*` compilando e testando na JVM antes de qualquer feature existir. |
+| Features em paralelo | Quatro agentes, um por feature, com o mesmo contrato: pacote `feature.<nome>`, ViewModel próprio recebendo só interfaces do domínio, rota `@Serializable`, extensão de `NavGraphBuilder` e módulo Koin; testes do `HomeViewModelTest` antigo repartidos. | Cada feature com `testAndroidHostTest` e `compileKotlinIosSimulatorArm64` verdes antes de o umbrella ser montado. |
+| Umbrella | `App.kt` só com tema e `NavHost` chamando as extensões; `Koin.kt` só juntando módulos; framework `Shared` exportando `core/player` (o Swift implementa `NativeVideoPlayer`). | APK e framework do simulador iOS compilando; 110 testes (106 Kotlin + 4 Java) verdes; os quatro `grep` de regra de dependência vazios. |
+
+Decisões que a divisão forçou, e por quê:
+
+- **Um ViewModel por feature, escopado à entrada da pilha.** O `HomeViewModel` único sobrevivia ao app inteiro e por isso rodava os comandos físicos no `viewModelScope`. Com ViewModel por tela, o que não pode morrer com a tela (comando na fechadura, `stopLive` ao sair da câmera) passou para um `CoroutineScope` da aplicação registrado no Koin (`APP_SCOPE_NAME`); a trava "um comando físico por vez" virou um `MutableStateFlow` único do app, compartilhado pelas instâncias do `DeviceViewModel`. Os dois comportamentos têm teste: `stopLiveRunsInAppScopeAndSurvivesTheViewModel` e `theInFlightGuardIsSharedBetweenViewModelInstances`.
+- **O aviso "token válido, mas não gravado" mudou de dono.** Antes era emitido pelo fluxo do token; agora a Home o deriva de `tokens.persisted` no `init` do seu ViewModel, porque token e Home são features diferentes.
+- **`core/testing` como módulo.** Os fakes saíram do `commonTest` do `shared` para um módulo publicado só para testes, no padrão do Now in Android, para todos os módulos usarem os mesmos dublês.
+
+Armadilhas encontradas:
+
+- **Comentário de bloco aninhado.** Kotlin aninha `/* */`; um "feature/*" dentro de um comentário do plugin de convenção engoliu o script inteiro, que virou um plugin vazio: os módulos que o aplicavam ficavam sem alvos e sem acessores tipados, sem nenhuma mensagem de erro. Diagnóstico: `javap` no `.class` gerado mostrou um corpo sem instruções.
+- **Acessores tipados e plugins de convenção.** Um plugin pré-compilado que aplica outro plugin pré-compilado não gera os acessores `kotlin { }` para quem o consome. Solução adotada: a configuração comum vive numa função Kotlin (`configureKmpLibrary()`) chamada pelos dois plugins, e cada módulo declara `alias(libs.plugins.kotlinMultiplatform)` ao lado do `id("casa.kmp.compose")` só para o Gradle gerar os acessores do script.
+- **`compileSdk` e o alvo Android do AGP 9.** O bloco `android { }` dentro de `kotlin { }` é a extensão aninhada de nome `android` (`KotlinMultiplatformAndroidLibraryTarget`); configurá-la em código Kotlin exige `(kotlin as ExtensionAware).extensions.configure("android")`.

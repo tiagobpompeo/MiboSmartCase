@@ -8,6 +8,7 @@ plugins {
 
 dependencies {
     implementation(projects.shared)
+    implementation(projects.core.domain) // TokenFormatJavaTest chama TokenFormat (Kotlin) a partir do Java
     implementation(libs.androidx.activity.compose)
     implementation(libs.koin.android)
     testImplementation(libs.junit) // TokenFormatJavaTest: teste em Java chamando o Kotlin do shared

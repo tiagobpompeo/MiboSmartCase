@@ -10,27 +10,24 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.compose.NavHost
-import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.toRoute
-import br.com.pompeo.casa.ui.CameraScreen
-import br.com.pompeo.casa.ui.DeviceScreen
-import br.com.pompeo.casa.ui.HomeShell
-import br.com.pompeo.casa.ui.HomeViewModel
+import br.com.pompeo.casa.domain.repository.TokenRepository
+import br.com.pompeo.casa.feature.camera.CameraRoute
+import br.com.pompeo.casa.feature.camera.cameraScreen
+import br.com.pompeo.casa.feature.device.DeviceRoute
+import br.com.pompeo.casa.feature.device.deviceScreen
+import br.com.pompeo.casa.feature.home.HomeRoute
+import br.com.pompeo.casa.feature.home.homeScreen
+import br.com.pompeo.casa.feature.token.TokenRoute
+import br.com.pompeo.casa.feature.token.tokenScreen
 import br.com.pompeo.casa.ui.MiboColors
-import br.com.pompeo.casa.ui.TokenScreen
-import br.com.pompeo.casa.ui.TokenValidation
-import kotlinx.serialization.Serializable
-import org.koin.compose.viewmodel.koinViewModel
+import org.koin.compose.koinInject
 
-// Rotas tipadas (Navigation Compose multiplataforma + kotlinx.serialization). Argumentos pequenos: a tela
-// busca o objeto no StateFlow do ViewModel pelo ns.
-@Serializable object TokenRoute
-@Serializable object HomeRoute
-@Serializable data class CameraRoute(val ns: String)
-@Serializable data class DeviceRoute(val ns: String)
-
-/** Raiz da UI compartilhada: a mesma árvore Compose roda no Android e no iOS. */
+/**
+ * Raiz da UI compartilhada: a mesma árvore Compose roda no Android e no iOS. O umbrella só monta o tema e o
+ * grafo de navegação; cada feature registra a própria tela (e o próprio ViewModel) por uma extensão de
+ * NavGraphBuilder. Rota nova = mais uma linha aqui e um módulo Koin em di/Koin.kt.
+ */
 @Composable
 fun App() {
     MaterialTheme(
@@ -44,34 +41,27 @@ fun App() {
             outline = MiboColors.Divider,
         )
     ) {
-        // Fora do NavHost: o dono é o ViewModelStoreOwner do host (Activity / ComposeUIViewController).
-        val vm = koinViewModel<HomeViewModel>()
+        // O token restaurado do cofre decide a tela inicial. Decidido UMA vez (senão o NavHost trocaria de
+        // destino a cada recomposição); o repositório é single do Koin, o mesmo que as features observam.
+        val tokens = koinInject<TokenRepository>()
         val nav = rememberNavController()
-        // Decidido UMA vez (senão o NavHost trocaria de destino a cada recomposição). Validação em andamento
-        // (token só na sessão) volta para a tela de token, que mostra o progresso.
-        val start: Any = remember { if (vm.token.value != null && vm.tokenValidation.value !is TokenValidation.Validating) HomeRoute else TokenRoute }
+        val start: Any = remember { if (tokens.token.value != null) HomeRoute else TokenRoute }
         // Só desempilha se a entrada ainda é o topo: um 2.º toque em "voltar" durante a transição de saída
-        // (ou o onBack da armadilha 33) desempilharia a Home e deixaria o NavHost em branco (beco sem saída no iOS).
+        // desempilharia a Home e deixaria o NavHost em branco (beco sem saída no iOS).
         // Não use dropUnlessResumed: na transição de entrada a tela está só STARTED e o toque legítimo se perderia.
         val popIfTop: (NavBackStackEntry) -> Unit = { entry -> if (nav.currentBackStackEntry?.id == entry.id) nav.popBackStack() }
         Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             NavHost(nav, startDestination = start) {
-                composable<TokenRoute> {
-                    TokenScreen(vm, onConnected = { nav.navigate(HomeRoute) { popUpTo<TokenRoute> { inclusive = true } } })
-                }
-                composable<HomeRoute> {
-                    HomeShell(
-                        vm,
-                        onCamera = { nav.navigate(CameraRoute(it.ns)) },
-                        onDevice = { nav.navigate(DeviceRoute(it.ns)) },
-                        // Limpa a pilha inteira: Sair só existe na Home, que é a base da pilha (o login a substituiu).
-                        // Não use popUpTo(0): popUpTo(Int) não está na API comum do Navigation, e a sobrecarga comum
-                        // de rota-objeto trataria 0 como rota e lançaria por não achá-la no grafo.
-                        onLogout = { vm.logout(); nav.navigate(TokenRoute) { popUpTo<HomeRoute> { inclusive = true } } },
-                    )
-                }
-                composable<CameraRoute> { entry -> CameraScreen(vm, entry.toRoute<CameraRoute>().ns, onBack = { popIfTop(entry) }) }
-                composable<DeviceRoute> { entry -> DeviceScreen(vm, entry.toRoute<DeviceRoute>().ns, onBack = { popIfTop(entry) }) }
+                tokenScreen(onConnected = { nav.navigate(HomeRoute) { popUpTo<TokenRoute> { inclusive = true } } })
+                homeScreen(
+                    onCamera = { nav.navigate(CameraRoute(it.ns)) },
+                    onDevice = { nav.navigate(DeviceRoute(it.ns)) },
+                    // Limpa a pilha inteira: Sair só existe na Home, que é a base da pilha (o login a substituiu).
+                    // Não use popUpTo(0): popUpTo(Int) não está na API comum do Navigation.
+                    onLogout = { nav.navigate(TokenRoute) { popUpTo<HomeRoute> { inclusive = true } } },
+                )
+                cameraScreen(onBack = popIfTop)
+                deviceScreen(onBack = popIfTop)
             }
         }
     }

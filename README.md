@@ -88,7 +88,7 @@ O token de `local.properties` só entra em builds de debug. Um build de release 
 ./gradlew :androidApp:assembleRelease
 ```
 
-Para forçar um ou outro comportamento: `-PgdiDevToken=false` (nunca embute) ou `-PgdiDevToken=true` (sempre embute). Confira em `shared/build/generated/gdi/commonMain/kotlin/br/com/pompeo/casa/GdiBuildConfig.kt`.
+Para forçar um ou outro comportamento: `-PgdiDevToken=false` (nunca embute) ou `-PgdiDevToken=true` (sempre embute). Confira em `core/data/build/generated/gdi/commonMain/kotlin/br/com/pompeo/casa/GdiBuildConfig.kt`.
 
 ---
 
@@ -120,50 +120,54 @@ Fora de propósito: **sem Media3** (o RTSP da nuvem não é aceito por ele; ver 
 
 ## Testes
 
-**91 testes** Kotlin em 14 classes de `shared/src/commonTest/kotlin/br/com/pompeo/casa/` (meta do projeto: ≥ 70), rodando na JVM e no simulador iOS: os 85 da lista da [especificação](docs/sdd/PROMPT-CASE-KMP.md), um de regressão para um fato da API medido no aparelho (`onlineUsesCompositeNsOnlyForSubdevices`) e cinco dos comandos da fechadura no `viewModelScope`. Usam `kotlin.test`, `kotlinx-coroutines-test` e `ktor-client-mock`, sem MockK: os dublês são fakes das interfaces do domínio (`TestSupport.kt`) e todo token é obviamente falso. Mais **4 testes em Java** (JUnit 4) no `androidApp`, que chamam a regra Kotlin `TokenFormat` como método estático (`@JvmStatic`).
+**106 testes** Kotlin em 17 classes, cada uma no módulo do código que testa (`core/*/src/commonTest`, `feature/*/src/commonTest`; meta do projeto: ≥ 70), rodando na JVM e no simulador iOS: os 85 da lista da [especificação](docs/sdd/PROMPT-CASE-KMP.md), um de regressão para um fato da API medido no aparelho (`onlineUsesCompositeNsOnlyForSubdevices`), os dos comandos da fechadura e, desde a modularização, os de cada ViewModel por feature (inclusive a prova de que `stopLive` e os comandos físicos sobrevivem ao fim do ViewModel da tela). Usam `kotlin.test`, `kotlinx-coroutines-test` e `ktor-client-mock`, sem MockK: os dublês são fakes das interfaces do domínio, no módulo `:core:testing` (`TestSupport.kt`), e todo token é obviamente falso. Mais **4 testes em Java** (JUnit 4) no `androidApp`, que chamam a regra Kotlin `TokenFormat` como método estático (`@JvmStatic`).
 
 ```sh
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
-./gradlew :shared:testAndroidHostTest      # JVM do host, sem emulador
-./gradlew :shared:iosSimulatorArm64Test    # binário de teste no simulador iOS
+./gradlew testAndroidHostTest              # todos os módulos, na JVM do host, sem emulador
+./gradlew iosSimulatorArm64Test            # os mesmos, como binários de teste no simulador iOS
 ./gradlew :androidApp:testDebugUnitTest    # testes em Java (JUnit 4)
+./gradlew :core:data:testAndroidHostTest   # ou só um módulo
 ```
 
-Relatório do Android: `shared/build/reports/tests/testAndroidHostTest/index.html`. O workflow de CI roda as duas suítes a cada push; hoje o job iOS passa e o job Android falha na preparação do SDK (ver "Limitações conhecidas").
+Relatório de cada módulo em `<módulo>/build/reports/tests/testAndroidHostTest/index.html`. O workflow de CI roda as duas suítes a cada push; hoje o job iOS passa e o job Android falha na preparação do SDK (ver "Limitações conhecidas").
 
-| Classe | Testes | O que cobre |
-|---|---:|---|
-| `TokenFormatTest` | 3 | normalização, plausibilidade e máscara do token |
-| `DomainModelTest` | 4 | origem, filtro, `hasMore`, escala de volume |
-| `TokenRepositoryImplTest` | 7 | sessão em memória × persistido, falha do armazenamento seguro |
-| `GdiApiTest` | 19 | Bearer, corpo, `text/plain`, renovação única (inclusive em paralelo), fechadura, vídeo, online de subdispositivo, erros reais |
-| `GdiDeviceParserTest` | 5 | envelopes e nomes de campo alternativos, dedup, tipos |
-| `GdiRealResponseTest` | 2 | resposta real anonimizada, `ns` composto, data formatada |
-| `GdiErrorMapperTest` | 5 | token ausente/inválido/expirado, rede, timeout, servidor |
-| `GdiFormatTest` | 2 | data/hora e tipos de evento da fechadura |
-| `DeviceRepositoryImplTest` | 17 | paginação, filtro com fallback, geração, cancelamento, logout, dois parceiros |
-| `SubmitTokenUseCaseTest` | 8 | validar antes de gravar, renovação durante a validação, cancelamento |
-| `ChangeLockVolumeUseCaseTest` | 3 | grava, relê e assume o pedido se a releitura falhar |
-| `HomeViewModelTest` | 10 | validação em `viewModelScope`, aviso de armazenamento, cancelamento, comandos da fechadura e do volume no `viewModelScope` (um por vez, erro e volume aplicado) |
-| `MiboLogicTest` | 5 | lentes, faixa da semana, rótulos |
-| `CameraFormatTest` | 1 | "1º quadro em X s" |
-| `TokenFormatJavaTest` (Java, `androidApp`) | 4 | a mesma regra do token chamada de Java: máscara, plausibilidade, normalização |
+| Classe | Módulo | Testes | O que cobre |
+|---|---|---:|---|
+| `TokenFormatTest` | `:core:domain` | 3 | normalização, plausibilidade e máscara do token |
+| `DomainModelTest` | `:core:domain` | 4 | origem, filtro, `hasMore`, escala de volume |
+| `TokenRepositoryImplTest` | `:core:data` | 7 | sessão em memória × persistido, falha do armazenamento seguro |
+| `GdiApiTest` | `:core:data` | 19 | Bearer, corpo, `text/plain`, renovação única (inclusive em paralelo), fechadura, vídeo, online de subdispositivo, erros reais |
+| `GdiDeviceParserTest` | `:core:data` | 5 | envelopes e nomes de campo alternativos, dedup, tipos |
+| `GdiRealResponseTest` | `:core:data` | 2 | resposta real anonimizada, `ns` composto, data formatada |
+| `GdiErrorMapperTest` | `:core:data` | 5 | token ausente/inválido/expirado, rede, timeout, servidor |
+| `GdiFormatTest` | `:core:data` | 2 | data/hora e tipos de evento da fechadura |
+| `DeviceRepositoryImplTest` | `:core:data` | 17 | paginação, filtro com fallback, geração, cancelamento, logout, dois parceiros |
+| `SubmitTokenUseCaseTest` | `:core:domain` | 8 | validar antes de gravar, renovação durante a validação, cancelamento |
+| `ChangeLockVolumeUseCaseTest` | `:core:domain` | 3 | grava, relê e assume o pedido se a releitura falhar |
+| `TokenViewModelTest` | `:feature:token` | 7 | validação em `viewModelScope`, Done/Failed, segundo toque ignorado, cancelamento ao limpar o ViewModel |
+| `HomeViewModelTest` | `:feature:home` | 7 | aviso de token não persistido no `init`, logout, delegação ao repositório, mapeamento de erro |
+| `CameraViewModelTest` | `:feature:camera` | 2 | `startLive` relança cancelamento; `stopLive` roda no escopo do app e sobrevive ao fim do ViewModel |
+| `DeviceViewModelTest` | `:feature:device` | 9 | comandos da fechadura e do volume no escopo do app (um por vez, inclusive entre instâncias do ViewModel, erro, volume aplicado), histórico 10/30 |
+| `MiboLogicTest` | `:core:ui` | 5 | lentes, faixa da semana, rótulos |
+| `CameraFormatTest` | `:feature:camera` | 1 | "1º quadro em X s" |
+| `TokenFormatJavaTest` (Java) | `:androidApp` | 4 | a mesma regra do token chamada de Java: máscara, plausibilidade, normalização |
 
 ---
 
 ## Arquitetura
 
-- **KMP + Compose Multiplatform:** um módulo `shared` com dados, domínio e UI em `commonMain`; `androidMain`, `iosMain` e Swift só com o que é nativo (armazenamento seguro, player de vídeo, calendário, debug/release). A mesma UI em Compose roda no Android (`MainActivity`) e no iOS (`MainViewController`).
-- **MVVM:** cada tela é um `@Composable` que desenha estado imutável coletado com `collectAsStateWithLifecycle` e chama funções do `HomeViewModel` (`StateFlow`, `viewModelScope`). Comandos físicos (abrir/fechar a fechadura, mudar o volume) também rodam no `viewModelScope` e a tela só observa `lockCommand`: girar o aparelho ou sair da tela no meio do envio não cancela um pedido que talvez já tenha chegado à fechadura. A navegação usa rotas tipadas e callbacks; o ViewModel não conhece o `NavController`.
-- **Clean Architecture:** `ui` → `domain` ← `data`. O `domain` é Kotlin puro (só coroutines): modelos, `DevicesState`, `AppError` selado, portas (`TokenRepository`, `DeviceRepository`, `DeviceProvider`, `LockController`, `TokenStorage`, `ErrorMapper`) e casos de uso. `di/Koin.kt` é a raiz de composição e registra cada `*Impl` pela interface.
+- **KMP + Compose Multiplatform, em módulos Gradle:** `core/*` (domínio, dados, componentes de UI, player, fakes de teste) e `feature/*` (uma tela ou fluxo por módulo, cada um com o próprio ViewModel, rota e módulo Koin), montados pelo umbrella `shared`, que gera o framework do iOS. Em cada módulo, `commonMain` tem o código comum e `androidMain`/`iosMain` só o que é nativo (armazenamento seguro, player de vídeo, calendário, debug/release). A mesma UI em Compose roda no Android (`MainActivity`) e no iOS (`MainViewController`). Detalhes na seção "Modularização".
+- **MVVM:** cada tela é um `@Composable` que desenha estado imutável coletado com `collectAsStateWithLifecycle` e chama funções do ViewModel da sua feature (`TokenViewModel`, `HomeViewModel`, `CameraViewModel`, `DeviceViewModel`; `StateFlow`, `viewModelScope`). O ViewModel vive com a entrada da pilha de navegação (sobrevive à rotação, morre ao sair da tela); por isso o que não pode morrer com a tela roda no escopo da aplicação (`APP_SCOPE_NAME`, um `CoroutineScope` registrado no Koin): os comandos físicos da fechadura, cuja trava "um por vez" é um estado único do app, e o encerramento da sessão de vídeo ao sair da câmera. A navegação usa rotas tipadas e callbacks; o ViewModel não conhece o `NavController`.
+- **Clean Architecture:** `feature/*` → `core/domain` ← `core/data`. O `domain` é Kotlin puro (só coroutines): modelos, `DevicesState`, `AppError` selado, portas (`TokenRepository`, `DeviceRepository`, `DeviceProvider`, `LockController`, `TokenStorage`, `ErrorMapper`) e casos de uso. `core/data` registra cada `*Impl` pela interface (`dataModule`), cada feature registra o próprio ViewModel, e `shared/di/Koin.kt` só junta os módulos.
 - **Só dois casos de uso**, onde há regra de negócio: `SubmitTokenUseCase` (validar o formato, testar o token carregando a 1.ª página, gravar só em sucesso, sair em erro ou cancelamento) e `ChangeLockVolumeUseCase` (gravar, reler e assumir o valor pedido se a releitura falhar). Listar, filtrar, paginar, vídeo e leituras da fechadura seriam casos de uso de uma linha, sem regra; o ViewModel chama a interface do repositório diretamente.
-- **Regra de dependência conferida** (os três comandos têm de vir vazios):
+- **Regra de dependência conferida pelo Gradle e por `grep`:** uma feature só declara `core/*` em `build.gradle.kts` (nunca outra feature nem `core/data`), e o `domain` não declara nada. Os quatro comandos abaixo têm de vir vazios:
 
 ```sh
-SRC=shared/src/commonMain/kotlin/br/com/pompeo/casa
-grep -rnE "^import (io\.ktor|org\.koin|androidx|org\.jetbrains\.compose|kotlinx\.serialization|br\.com\.pompeo\.casa\.(data|ui|di|player|platform))" "$SRC/domain"
-grep -rnE "^import (br\.com\.pompeo\.casa\.data|io\.ktor)" "$SRC/ui" "$SRC/player" "$SRC/App.kt"
-grep -n "^import br\.com\.pompeo\.casa\." "$SRC/ui/HomeViewModel.kt" | grep -v "br\.com\.pompeo\.casa\.domain\."
+grep -rln "import org.koin\|import io.ktor\|import androidx.compose\|br.com.pompeo.casa.data\|br.com.pompeo.casa.ui" core/domain/src/commonMain
+grep -rn "import br.com.pompeo.casa.data\." feature/*/src/commonMain core/ui/src core/player/src
+grep -rn "import br.com.pompeo.casa.feature\." feature/*/src/commonMain | awk -F: '{split($1,a,"/"); if ($0 !~ "feature\\."a[2]"\\.") print}'
+grep -rl "br.com.pompeo.casa.feature" --include="*.kt" --include="*.java" core androidApp
 ```
 
 ---
@@ -257,26 +261,37 @@ Quem tem câmeras, fechadura e hub Intelbras quer, num só app, ver a câmera ao
 
 O roteiro de 19 passos (RF01–RF09) foi executado no Android físico com a API real em 05/10/2026, com comparação lado a lado com as capturas de referência; no iPhone físico, token vencido, Home, vídeo ao vivo, fechadura e hub foram conferidos com a API real em 06/10/2026. Pendente: o erro ao "Carregar mais" sem rede (linha 8b), conferido só contra o servidor local (detalhes na seção "Verificação em aparelho" do README do repositório).
 
-### Camadas
+### Camadas e módulos
 
 ```
-   apresentação (pacote ui/ + App.kt + player/)          dados (pacote data/)
-   Composables ── eventos ──► HomeViewModel               TokenRepositoryImpl · DeviceRepositoryImpl
-        ▲                        │  StateFlow (estado)     GdiApi (Ktor) · GdiDeviceProvider · GdiErrorMapper
-        └──── estado imutável ───┘                         KeystoreTokenStorage / KeychainTokenStorage
-                                 │ depende de                      │ implementa
-                                 ▼                                 ▼
-               ┌──────────────────── domain/ (Kotlin puro) ────────────────────┐
-               │ modelos: Device, DeviceQuery, DevicePage, LockDetails, …       │
-               │ estados/erros: DevicesState, AppError                          │
-               │ portas: TokenRepository, DeviceRepository, DeviceProvider,     │
-               │         LockController, TokenStorage, ErrorMapper              │
-               │ casos de uso: SubmitTokenUseCase, ChangeLockVolumeUseCase      │
-               └────────────────────────────────────────────────────────────────┘
-   di/Koin.kt (raiz de composição) é o único lugar que conhece as três camadas e liga interface → implementação.
+ feature/token      feature/home       feature/camera      feature/device        ← uma tela por módulo:
+ TokenScreen        HomeShell          CameraScreen        DeviceScreen             Composable + ViewModel
+ TokenViewModel     HomeViewModel      CameraViewModel     DeviceViewModel          + rota + módulo Koin
+       │                 │                  │ ─── core/player ──│                  (feature nunca vê feature)
+       └─────────────────┴────── core/ui ───┴───────────────────┘                   core/ui: MiboColors, FitText,
+                                   │                                                 componentes, calendário, debug
+                                   ▼  só interfaces
+               ┌──────────────── core/domain (Kotlin puro) ──────────────────┐
+               │ modelos: Device, DeviceQuery, DevicePage, LockDetails, …    │
+               │ estados/erros: DevicesState, AppError                       │
+               │ portas: TokenRepository, DeviceRepository, DeviceProvider,  │
+               │         LockController, TokenStorage, ErrorMapper           │
+               │ casos de uso: SubmitTokenUseCase, ChangeLockVolumeUseCase   │
+               └─────────────────────────────────────────────────────────────┘
+                                   ▲  implementa
+                                   │
+               core/data: TokenRepositoryImpl · DeviceRepositoryImpl · GdiApi (Ktor) · GdiDeviceProvider
+                          · GdiErrorMapper · Keystore/Keychain (platformModule) · dataModule
+               core/testing: fakes das portas, usados pelos testes de todos os módulos
+
+ shared (umbrella): App.kt (tema + NavHost chamando tokenScreen/homeScreen/cameraScreen/deviceScreen),
+                    di/Koin.kt (junta dataModule, platformModule e os quatro *FeatureModule),
+                    MainViewController (iOS). É o único módulo que conhece todas as features e o que
+                    gera o framework "Shared" para o Xcode (exportando core/player, que o Swift implementa).
+ androidApp / iosApp: só a casca nativa (Application, Activity, SwiftUI host).
 ```
 
-Só `data/gdi` conhece a GDI (rotas, nomes de campo, códigos de erro, formato de data); o que sai de lá já é modelo do domínio, com textos prontos para exibir. Toda falha vira `AppError` (selado, `when` exaustivo) num único lugar, o `GdiErrorMapper`. A UI recebe só interfaces do domínio por injeção.
+Só `core/data/gdi` conhece a GDI (rotas, nomes de campo, códigos de erro, formato de data); o que sai de lá já é modelo do domínio, com textos prontos para exibir. Toda falha vira `AppError` (selado, `when` exaustivo) num único lugar, o `GdiErrorMapper`. As features recebem só interfaces do domínio por injeção.
 
 ### Múltiplos parceiros
 
@@ -284,17 +299,46 @@ Só `data/gdi` conhece a GDI (rotas, nomes de campo, códigos de erro, formato d
 
 ### Modularização
 
-Hoje: um módulo Gradle `shared` (mais `androidApp` e `iosApp`), com fronteiras por pacote (`ui` → `domain` ← `data`) conferidas por três buscas de `import` que têm de vir vazias: `domain` sem Ktor, Koin, Compose, `androidx`, `kotlinx.serialization` nem outras camadas; `ui`, `player` e `App.kt` sem `data` nem Ktor; `HomeViewModel` só com imports de `domain`. Para o tamanho do case isso mantém o build simples. Quando o app crescer, a divisão prevista é:
+O app é dividido em módulos Gradle no padrão usado hoje no mercado (o mesmo do [Now in Android](https://github.com/android/nowinandroid), adaptado a KMP com o módulo umbrella que a JetBrains recomenda para o framework do iOS): **`core/*`** sem tela, **`feature/*`** com uma tela ou fluxo cada, **`shared`** como umbrella, e **plugins de convenção** num build incluído (`build-logic/`) para a configuração não se repetir.
 
-| Módulo | Conteúdo |
-|---|---|
-| `:core:domain` | Kotlin puro: modelos, estados, `AppError`, portas e casos de uso |
-| `:data:gdi` | cliente, parser e mapeador de erro da GDI; registra seu `DeviceProvider` no Koin (um módulo por parceiro) |
-| `:feature:home` | token, Home e Definições |
-| `:feature:camera` | tela de câmera e player |
-| `:feature:lock` | fechadura e hub |
+| Módulo | Conteúdo | Depende de |
+|---|---|---|
+| `:core:domain` | Kotlin puro: modelos, estados, `AppError`, portas e casos de uso | nada |
+| `:core:data` | Ktor contra a GDI, parser, mapeador de erro, repositórios, Keystore/Keychain; `dataModule` e `platformModule` do Koin; gera `GdiBuildConfig` | domain |
+| `:core:ui` | design system (cores Mibo, `FitText`, cartões, diálogos), calendário e flag de debug (`expect/actual`) | domain |
+| `:core:player` | `expect fun CameraPlayer`: libVLC no Android, VLCKit via Swift no iOS | — |
+| `:core:testing` | fakes das portas (`FakeDeviceRepository`, `FakeLockController`…) para os testes dos outros módulos | domain |
+| `:feature:token` | RF01: `TokenScreen`, `TokenViewModel`, `TokenRoute`, `tokenScreen()`, `tokenFeatureModule` | domain, ui |
+| `:feature:home` | RF02/07/08: `HomeShell` (lista, filtros, paginação, definições), `HomeViewModel` | domain, ui |
+| `:feature:camera` | RF03: `CameraScreen`, `CameraViewModel` | domain, ui, player |
+| `:feature:device` | RF05/06/09: fechadura, hub e outros, `DeviceViewModel` (comandos físicos) | domain, ui |
+| `:shared` | umbrella: `App.kt` (NavHost), `Koin.kt` (junta os módulos), framework `Shared` para o Xcode | todos |
+| `:androidApp` / `iosApp` | casca nativa | shared (+ domain, para o teste em Java) |
 
-`androidApp` e `iosApp` passam a depender só das features, e cada feature ganha o seu ViewModel no lugar do `HomeViewModel` único.
+**Regras:** feature → core; feature nunca depende de feature nem de `core:data` (fala com os dados pelas interfaces do domínio, injetadas); só `shared` conhece as features; `core:domain` não conhece ninguém. As regras valem no `build.gradle.kts` (uma feature não declara outra) e são conferidas por `grep` (seção "Arquitetura").
+
+**Plugins de convenção** (`build-logic/convention/src/main/kotlin/`): `casa.kmp.library` (alvos Android + iPhone + simulador, JVM 11, namespace derivado do caminho do módulo, testes na JVM do host) e `casa.kmp.compose` (o anterior + Compose Multiplatform, navegação tipada, ViewModel e Koin para Compose). Um módulo novo tem um `build.gradle.kts` de poucas linhas:
+
+```kotlin
+plugins {
+    alias(libs.plugins.kotlinMultiplatform)   // só para o Gradle gerar os acessores tipados deste script
+    id("casa.kmp.compose")
+}
+kotlin.sourceSets.commonMain.dependencies {
+    api(projects.core.domain)
+    implementation(projects.core.ui)
+}
+```
+
+**Como entra uma feature nova** (por exemplo, `feature/perfil`):
+1. Pasta `feature/perfil/` com o `build.gradle.kts` acima e `include(":feature:perfil")` no `settings.gradle.kts`.
+2. No pacote `br.com.pompeo.casa.feature.perfil`: a tela (`@Composable`), o `PerfilViewModel` (só interfaces do domínio no construtor), a rota `@Serializable object PerfilRoute`, a extensão `fun NavGraphBuilder.perfilScreen(…)` que faz `composable<PerfilRoute> { koinViewModel<PerfilViewModel>() … }`, e `val perfilFeatureModule = module { viewModelOf(::PerfilViewModel) }`.
+3. No umbrella: `perfilFeatureModule` na lista de `shared/di/Koin.kt` e `perfilScreen(…)` no `NavHost` de `App.kt`.
+4. Testes em `feature/perfil/src/commonTest`, com os fakes de `:core:testing`.
+
+Nada em `core/*`, nas outras features, no `androidApp` ou no `iosApp` muda. Um parceiro novo segue o mesmo caminho em `core/data` (ou num `core/data-<parceiro>` próprio): mais um `single<DeviceProvider>(named(…))`, que o repositório recebe por `getAll()`.
+
+**O que a modularização custou e rendeu neste projeto:** o `HomeViewModel` único virou quatro ViewModels, um por feature, e o que não pode morrer com a tela (comando físico, `stopLive`) passou a rodar no escopo da aplicação, com a trava "um comando por vez" como estado único do app; os testes foram para o módulo do código que cobrem (106 Kotlin + 4 Java). O build do Android e o framework do iOS continuam os mesmos para quem consome (`MainActivity`, `MainViewController`, Swift).
 
 ### Interoperabilidade com Java
 
@@ -347,7 +391,7 @@ Medido na conta de teste entre 02 e 05/10/2026; onde diverge do Swagger, vale o 
 - Tela de licenças (LGPL 2.1+ do libVLC/VLCKit) e revisão jurídica antes de publicar, sobretudo no iOS.
 - Media3 para o caso HTTPS/MP4, se um dia a API devolver o que o Swagger promete.
 - Backend próprio: guardar a credencial, entregar só URLs de vídeo curtas e receber webhooks (eventos em tempo real nas abas de mensagens).
-- Divisão em módulos (`:core:domain`, `:data:gdi`, `:feature:home`, `:feature:camera`, `:feature:lock`) quando entrar um segundo parceiro ou uma nova feature.
+- Um módulo `core/data-<parceiro>` por parceiro novo, com o próprio `DeviceProvider`, quando entrar o segundo.
 - `detekt` e `ktlint` no CI.
 
 ---

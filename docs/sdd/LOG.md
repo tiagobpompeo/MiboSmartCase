@@ -64,3 +64,30 @@ Armadilhas encontradas:
 - **`compileSdk` e o alvo Android do AGP 9.** O bloco `android { }` dentro de `kotlin { }` é a extensão aninhada de nome `android` (`KotlinMultiplatformAndroidLibraryTarget`); configurá-la em código Kotlin exige `(kotlin as ExtensionAware).extensions.configure("android")`.
 
 Depois da divisão, o app modular foi instalado com um token novo nos dois aparelhos físicos (14/10): no Moto G9 Play, token → Home → fechadura → hub → câmera ao vivo sem crash; no iPhone 13 Pro, Home e câmera ao vivo. O registro módulo a módulo (arquivos, origem, API pública, testes) está em [modularizacao.md](../modularizacao.md).
+
+## 7. Testes de UI (15/10/2026)
+
+O enunciado pede testes unitários e de UI. Os unitários existiam desde o início (106 Kotlin + 4 Java); os de UI entraram em 15/10, depois da modularização, no mesmo padrão "cada módulo testa o que é seu": uma classe `*ScreenUiTest` por feature, em `commonTest`, com a API de teste do Compose Multiplatform. Como foi feito e verificado:
+
+| Etapa | O que foi feito | Como foi verificado |
+|---|---|---|
+| Fontes | Lida a página [Testing Compose Multiplatform UI](https://kotlinlang.org/docs/multiplatform/compose-test.html) da JetBrains: testes em `commonTest` com `org.jetbrains.compose.ui:ui-test`; no Android, `withDeviceTestBuilder { sourceSetTreeName = "test" }` para o source set de aparelho compilar o `commonTest`; `AndroidJUnitRunner`, `ui-test-junit4-android` e `ui-test-manifest`. | A versão do Jetpack Compose resolvida no classpath Android (`androidx.compose.ui:ui` 1.12.1) bate com a do Compose Multiplatform 1.12.1, então `ui-test-junit4-android` e `ui-test-manifest` ficaram em 1.12.1. |
+| Convenção | Terceiro plugin, `casa.kmp.feature` (= `casa.kmp.compose` + `configureComposeUiTests()` + as dependências de toda feature). A configuração de Compose saiu do script para `configureComposeMultiplatform()`, chamada pelos dois plugins. O `build.gradle.kts` das quatro features caiu para o bloco `plugins` (a câmera acrescenta `core:player`). | Um teste de fumaça na tela do token passou no simulador iOS (`:feature:token:iosSimulatorArm64Test`) e no Moto (`:feature:token:connectedAndroidDeviceTest`, 8 testes) antes de qualquer outra tela ser escrita; `testAndroidHostTest` continuou com só os 7 unitários. |
+| Quatro telas em paralelo | Quatro agentes, um por feature, com o mesmo contrato: 3 a 5 testes por tela, só texto visível e `contentDescription`, só fakes de `:core:testing`, sem rede, sem Koin, sem NavHost, sem compor o player, sem tocar código de produção. Um revisor por feature conferiu os textos contra a tela e o `git status`. | 20 testes verdes no simulador iOS; nenhuma alteração fora dos arquivos `*UiTest.kt` (nem em `core/testing`). |
+| Aparelho | Os quatro `connectedAndroidDeviceTest` em série no Moto G9 Play, depois as suítes completas da JVM e do simulador iOS. | Moto: token 12, Home 12, câmera 8, dispositivo 14 testes (20 de UI + 26 unitários), 0 falhas, 2 min 58 s. JVM do host: 106 unitários, 0 de UI, 0 falhas. Simulador iOS: 106 unitários + 20 de UI, 0 falhas. Java: 4. |
+
+Decisões, e por quê:
+
+- **Testes de UI no `commonTest`, não num source set à parte.** É o que a documentação da JetBrains recomenda e o que faz o mesmo arquivo rodar no simulador iOS e no aparelho Android. O preço é que a JVM do host, sem Activity, não os executa: a convenção exclui as classes `*UiTest` de `testAndroidHostTest` pelo nome. Por isso o sufixo é regra.
+- **Sem `testTag` nas telas.** Os testes usam só o que o usuário vê (texto e `contentDescription`); nenhuma tela mudou para ser testável. Quando um comportamento não tinha semântica observável (modo lista × grade, estado "Validando token…" com fakes síncronos), ficou de fora e está anotado no KDoc do teste.
+- **O player nunca é composto.** No iOS o `CameraPlayer` exige o `NativeVideoPlayer` registrado pelo Swift; no Android carrega a libVLC. O teste da câmera mantém a sessão pendente (`awaitCancellation`) ou a faz falhar, e cobre o que vem antes do vídeo: etapa, erro, "Tentar novamente", avisos de PTZ/gravação/multiview, lente fixa, voltar.
+- **Comandos da fechadura só no dublê.** O teste de dispositivo segura o círculo, cancela (nenhum comando) e confirma (exatamente um comando no `FakeLockController`). A regra do projeto de nunca confirmar um comando real continua valendo: o teste nunca chega à API.
+- **Tamanho do canvas.** O `runComposeUiTest` do simulador iOS desenha em 1024 × 768 (paisagem); as telas mais altas são hospedadas num `Box` de 360 × 720 dp no teste e usam `performScrollTo()` antes de ler o rodapé, para o mesmo teste valer no Moto (360 × ~750 dp).
+
+Armadilhas encontradas:
+
+- **`composeResources` na variante de teste em aparelho.** O Compose Multiplatform 1.12.1 registra `copyAndroidDeviceTestComposeResourcesToAndroidAssets` sem configurar `outputDirectory`, e o Gradle recusa a task. A classe é `internal`, então `configureComposeUiTests()` alcança as propriedades pelo nome (`property("outputDirectory")`) e dá valores padrão vazios: as features não têm `composeResources`.
+- **`runComposeUiTest` deprecated.** No `ui-test` 1.12.1 a função da raiz do pacote está marcada como deprecated em favor de `androidx.compose.ui.test.v2.runComposeUiTest` (com `StandardTestDispatcher` por padrão). As quatro classes usam a função antiga, de propósito, para a migração ser um passo só depois; fica como pendência.
+- **`onNodeWithText` enxerga o texto digitado mesmo mascarado.** Para provar que o olho oculta o token, o teste do token lê a propriedade `EditableText` (o texto já transformado) com um matcher próprio.
+
+Pendências desta etapa: migrar as quatro classes para `androidx.compose.ui.test.v2`; teste instrumentado de ponta a ponta no `androidApp` (token → Home com Koin de fakes) e alvo XCUITest no `iosApp`, que o desenho da arquitetura ainda marca como faltando.

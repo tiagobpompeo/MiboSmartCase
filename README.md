@@ -120,12 +120,13 @@ Fora de propósito: **sem Media3** (o RTSP da nuvem não é aceito por ele; ver 
 
 ## Testes
 
-**106 testes** Kotlin em 17 classes, cada uma no módulo do código que testa (`core/*/src/commonTest`, `feature/*/src/commonTest`; meta do projeto: ≥ 70), rodando na JVM e no simulador iOS: os 85 da lista da [especificação](docs/sdd/PROMPT-CASE-KMP.md), um de regressão para um fato da API medido no aparelho (`onlineUsesCompositeNsOnlyForSubdevices`), os dos comandos da fechadura e, desde a modularização, os de cada ViewModel por feature (inclusive a prova de que `stopLive` e os comandos físicos sobrevivem ao fim do ViewModel da tela). Usam `kotlin.test`, `kotlinx-coroutines-test` e `ktor-client-mock`, sem MockK: os dublês são fakes das interfaces do domínio, no módulo `:core:testing` (`TestSupport.kt`), e todo token é obviamente falso. Mais **4 testes em Java** (JUnit 4) no `androidApp`, que chamam a regra Kotlin `TokenFormat` como método estático (`@JvmStatic`).
+**106 testes unitários** Kotlin em 17 classes, cada uma no módulo do código que testa (`core/*/src/commonTest`, `feature/*/src/commonTest`; meta do projeto: ≥ 70), rodando na JVM e no simulador iOS, mais **20 testes de UI** em 4 classes (uma por tela, ver "Testes de UI" abaixo): os 85 da lista da [especificação](docs/sdd/PROMPT-CASE-KMP.md), um de regressão para um fato da API medido no aparelho (`onlineUsesCompositeNsOnlyForSubdevices`), os dos comandos da fechadura e, desde a modularização, os de cada ViewModel por feature (inclusive a prova de que `stopLive` e os comandos físicos sobrevivem ao fim do ViewModel da tela). Usam `kotlin.test`, `kotlinx-coroutines-test` e `ktor-client-mock`, sem MockK: os dublês são fakes das interfaces do domínio, no módulo `:core:testing` (`TestSupport.kt`), e todo token é obviamente falso. Mais **4 testes em Java** (JUnit 4) no `androidApp`, que chamam a regra Kotlin `TokenFormat` como método estático (`@JvmStatic`).
 
 ```sh
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 ./gradlew testAndroidHostTest              # todos os módulos, na JVM do host, sem emulador
-./gradlew iosSimulatorArm64Test            # os mesmos, como binários de teste no simulador iOS
+./gradlew iosSimulatorArm64Test            # os mesmos + os testes de UI, como binários de teste no simulador iOS
+./gradlew :feature:token:connectedAndroidDeviceTest   # unitários + UI da feature no aparelho Android conectado (USB)
 ./gradlew :androidApp:testDebugUnitTest    # testes em Java (JUnit 4)
 ./gradlew :core:data:testAndroidHostTest   # ou só um módulo
 ```
@@ -149,9 +150,24 @@ Relatório de cada módulo em `<módulo>/build/reports/tests/testAndroidHostTest
 | `HomeViewModelTest` | `:feature:home` | 7 | aviso de token não persistido no `init`, logout, delegação ao repositório, mapeamento de erro |
 | `CameraViewModelTest` | `:feature:camera` | 2 | `startLive` relança cancelamento; `stopLive` roda no escopo do app e sobrevive ao fim do ViewModel |
 | `DeviceViewModelTest` | `:feature:device` | 9 | comandos da fechadura e do volume no escopo do app (um por vez, inclusive entre instâncias do ViewModel, erro, volume aplicado), histórico 10/30 |
+| `TokenScreenUiTest` (UI) | `:feature:token` | 5 | título e "Entrar" desabilitado; habilita só com token plausível; token aceito chama `onConnected` e persiste; token recusado mostra a mensagem e fica na tela; o olho mostra/oculta o token |
+| `HomeShellUiTest` (UI) | `:feature:home` | 5 | nomes da página; vazio com filtro e chips trocam a origem; "Carregar mais" pede a página seguinte; cartão → `onCamera`/`onDevice`; Definições → Sair |
+| `CameraScreenUiTest` (UI) | `:feature:camera` | 5 | nome e etapa enquanto conecta (sem compor o player); erro + "Tentar novamente" repete o pedido; avisos de PTZ, gravação e multiview; lente fixa e voltar |
+| `DeviceScreenUiTest` (UI) | `:feature:device` | 5 | estado, bateria, Online e instrução da fechadura; a porta só muda com segurar + confirmar (no dublê); volume com 4 níveis e confirmação; histórico 10 → 30; hub com filhos e diálogo de firmware |
 | `MiboLogicTest` | `:core:ui` | 5 | lentes, faixa da semana, rótulos |
 | `CameraFormatTest` | `:feature:camera` | 1 | "1º quadro em X s" |
 | `TokenFormatJavaTest` (Java) | `:androidApp` | 4 | a mesma regra do token chamada de Java: máscara, plausibilidade, normalização |
+
+### Testes de UI
+
+Os testes de UI são escritos **uma vez, em `commonTest` de cada feature**, com a API de teste do Compose Multiplatform (`runComposeUiTest`): a tela é composta com o ViewModel real e os fakes de `:core:testing`, sem rede, sem Koin e sem NavHost; o player de vídeo nunca é composto (a sessão fica pendente ou falha). O mesmo arquivo roda em dois lugares:
+
+| Onde | Comando | Como |
+|---|---|---|
+| Simulador iOS | `./gradlew :feature:<nome>:iosSimulatorArm64Test` | no mesmo binário de teste dos unitários |
+| Aparelho Android | `./gradlew :feature:<nome>:connectedAndroidDeviceTest` | como teste instrumentado: a convenção `casa.kmp.feature` põe o source set `androidDeviceTest` na árvore de `commonTest` (`withDeviceTestBuilder { sourceSetTreeName = "test" }`), com `AndroidJUnitRunner`, `ui-test-junit4-android` e `ui-test-manifest` |
+
+Na JVM do host (`testAndroidHostTest`) não há Activity, então as classes cujo nome termina em `UiTest` ficam de fora; os unitários continuam lá. Os testes de UI só precisam de texto visível e `contentDescription`: nenhuma tela ganhou `testTag` por causa deles. Duas armadilhas ficaram no plugin de convenção: o Compose 1.12.1 registra a cópia de `composeResources` para a variante de teste em aparelho sem configurar a task (o plugin dá os valores padrão), e `runComposeUiTest` da raiz do pacote está marcado como deprecated em favor de `androidx.compose.ui.test.v2` (a migração das 4 classes é um passo só, pendente).
 
 ---
 
@@ -209,7 +225,7 @@ grep -rl "br.com.pompeo.casa.feature" --include="*.kt" --include="*.java" core a
 
 ## Verificação em aparelho
 
-**Estado: executado em 05 e 06/10/2026 no Moto G9 Play (Android 11) e no iPhone 13 Pro com a API real e a conta de teste** e repetido em 14/10/2026 com o app modular nos dois aparelhos (linha 20) (iPhone 13 Pro físico em 06/10/2026, com a API real: token vencido, Home, vídeo ao vivo, fechadura e hub). Na linha 8, o caso (a), sem rede, foi conferido no iPhone físico; o caso (b), erro ao carregar mais, só contra um servidor local que imita o contrato da seção "Contrato real × Swagger". Nenhum comando de fechadura ou de volume foi confirmado.
+**Estado: executado em 05 e 06/10/2026 no Moto G9 Play (Android 11) e no iPhone 13 Pro com a API real e a conta de teste** e repetido em 14/10/2026 com o app modular nos dois aparelhos (linha 20); em 15/10/2026 os testes de UI das quatro telas rodaram no Moto como instrumentados (linha 21) (iPhone 13 Pro físico em 06/10/2026, com a API real: token vencido, Home, vídeo ao vivo, fechadura e hub). Na linha 8, o caso (a), sem rede, foi conferido no iPhone físico; o caso (b), erro ao carregar mais, só contra um servidor local que imita o contrato da seção "Contrato real × Swagger". Nenhum comando de fechadura ou de volume foi confirmado.
 
 Preparação: apagar os dados do app (`adb shell pm clear br.com.pompeo.casa`; no iPhone, apagar e reinstalar), gerar um token novo no portal e colocá-lo em `local.properties` ou colá-lo na tela. Comandos de fechadura e de volume só são confirmados com autorização explícita do dono da conta.
 
@@ -235,6 +251,7 @@ Preparação: apagar os dados do app (`adb shell pm clear br.com.pompeo.casa`; n
 | 18 | — | Definições → Sair | Volta à tela de token; o "voltar" do sistema não retorna à Home | 05/10 23:56 | Moto G9 Play | OK: voltou ao token; o "voltar" saiu do app; reabrir pediu o token de novo |
 | 19 | — | Repetir 4, 9, 13 e 17 no iPhone | Mesmo comportamento; vídeo via VLCKit (1.º quadro a frio pode passar de 30 s) | 06/10 12:53 | iPhone 13 Pro | OK no iPhone físico. 4: iM4 Dual (badge 2), MFR 2030 (via hub), MCA 1002; banner e nomes inteiros na tela de 390 pt. 9: "AO VIVO", "1º quadro em 39,2 s" a frio via VLCKit (o relógio da câmera avançava, e o Moto G9 mostrou a mesma cena no mesmo momento). 13: bateria 26 %, Online, "Porta aberta", volume com o HTTP 500 real e níveis habilitados (não tocados). 17: Online, faixa da semana com hoje em verde, 1 subdispositivo, "Firmware 2.4.628243" "Atualizado" |
 | 20 | — | Repetir 4, 9, 13, 16 e 17 com o app modular (seção "Modularização") | Mesmo comportamento do app de um módulo só | 14/10 | Moto G9 Play; iPhone 13 Pro | OK. Moto: token novo → Home com iM4 Dual, MFR 2030 (via hub) e MCA 1002; MFR 2030 "Porta fechada", bateria 25 %, Online, histórico; MCA 1002 Online, "Firmware 2.4.628243"; iM4 Dual "AO VIVO", "1º quadro em 81,1 s" a frio; nenhum crash no logcat. iPhone: Home e iM4 Dual "AO VIVO", "1º quadro em 42,7 s", depois de trocar o token na tela. Nenhum comando de fechadura ou de volume enviado |
+| 21 | RF01–RF09 | Testes de UI das 4 telas no aparelho: `./gradlew :feature:<nome>:connectedAndroidDeviceTest` (seção "Testes de UI") | 20 testes de UI + 26 unitários das features, instrumentados, verdes; nenhum comando real (só dublês) | 15/10 10:13 | Moto G9 Play; simulador iOS | OK: token 12, Home 12, câmera 8, dispositivo 14 testes, 0 falhas, em 2 min 58 s no Moto; os mesmos 20 de UI verdes no simulador iOS (`iosSimulatorArm64Test`) e fora da JVM do host, como previsto |
 
 Passo final: capturar cada tela no Android (`adb exec-out screencap -p > tela-<nome>.png`) e no iPhone e comparar lado a lado com as capturas de referência do Mibo Smart. Só são aceitas diferenças de recurso que a GDI não oferece ou de conteúdo de outra conta. Depois, salvar as telas finais em `docs/telas/` (`adb exec-out screencap -p > docs/telas/android-<tela>.png`; no iPhone, botões laterais, salvando como `docs/telas/ios-<tela>.png`) e referenciá-las neste README.
 
@@ -320,24 +337,29 @@ O detalhe módulo a módulo (arquivos, de onde cada um veio, API pública, depen
 
 **Regras:** feature → core; feature nunca depende de feature nem de `core:data` (fala com os dados pelas interfaces do domínio, injetadas); só `shared` conhece as features; `core:domain` não conhece ninguém. As regras valem no `build.gradle.kts` (uma feature não declara outra) e são conferidas por `grep` (seção "Arquitetura").
 
-**Plugins de convenção** (`build-logic/convention/src/main/kotlin/`): `casa.kmp.library` (alvos Android + iPhone + simulador, JVM 11, namespace derivado do caminho do módulo, testes na JVM do host) e `casa.kmp.compose` (o anterior + Compose Multiplatform, navegação tipada, ViewModel e Koin para Compose). Um módulo novo tem um `build.gradle.kts` de poucas linhas:
+**Plugins de convenção** (`build-logic/convention/src/main/kotlin/`), um por tipo de módulo:
+
+| Plugin | Para | Dá ao módulo |
+|---|---|---|
+| `casa.kmp.library` | `core/domain`, `core/data`, `core/testing` | alvos Android + iPhone + simulador, JVM 11, namespace derivado do caminho, coroutines, `kotlin.test` e testes unitários na JVM do host (`testAndroidHostTest`) e no simulador iOS |
+| `casa.kmp.compose` | `core/ui`, `core/player`, `shared` | o anterior + Compose Multiplatform, navegação tipada, ViewModel e Koin para Compose |
+| `casa.kmp.feature` | `feature/*` | o anterior + **testes de UI** (`ui-test` no `commonTest`, teste instrumentado no aparelho Android) + as dependências de toda feature: `api(core:domain)`, `implementation(core:ui)`, `core:testing` só nos testes |
+
+A configuração vive em funções Kotlin (`configureKmpLibrary`, `configureComposeMultiplatform`, `configureComposeUiTests`) chamadas pelos três scripts. Um módulo de feature novo tem um `build.gradle.kts` de duas linhas úteis:
 
 ```kotlin
 plugins {
     alias(libs.plugins.kotlinMultiplatform)   // só para o Gradle gerar os acessores tipados deste script
-    id("casa.kmp.compose")
+    id("casa.kmp.feature")
 }
-kotlin.sourceSets.commonMain.dependencies {
-    api(projects.core.domain)
-    implementation(projects.core.ui)
-}
+// dependências extras só se a feature precisar (a câmera acrescenta implementation(projects.core.player))
 ```
 
 **Como entra uma feature nova** (por exemplo, `feature/perfil`):
-1. Pasta `feature/perfil/` com o `build.gradle.kts` acima e `include(":feature:perfil")` no `settings.gradle.kts`.
+1. Pasta `feature/perfil/` com o `build.gradle.kts` acima e `include(":feature:perfil")` no `settings.gradle.kts`. Com isso a feature já tem alvos, Compose, Koin, navegação, testes unitários e de UI configurados.
 2. No pacote `br.com.pompeo.casa.feature.perfil`: a tela (`@Composable`), o `PerfilViewModel` (só interfaces do domínio no construtor), a rota `@Serializable object PerfilRoute`, a extensão `fun NavGraphBuilder.perfilScreen(…)` que faz `composable<PerfilRoute> { koinViewModel<PerfilViewModel>() … }`, e `val perfilFeatureModule = module { viewModelOf(::PerfilViewModel) }`.
 3. No umbrella: `perfilFeatureModule` na lista de `shared/di/Koin.kt` e `perfilScreen(…)` no `NavHost` de `App.kt`.
-4. Testes em `feature/perfil/src/commonTest`, com os fakes de `:core:testing`.
+4. Testes em `feature/perfil/src/commonTest`, com os fakes de `:core:testing`: `PerfilViewModelTest` (unitário) e `PerfilScreenUiTest` (UI, com `runComposeUiTest`).
 
 Nada em `core/*`, nas outras features, no `androidApp` ou no `iosApp` muda. Um parceiro novo segue o mesmo caminho em `core/data` (ou num `core/data-<parceiro>` próprio): mais um `single<DeviceProvider>(named(…))`, que o repositório recebe por `getAll()`.
 

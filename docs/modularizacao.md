@@ -57,25 +57,31 @@ MiboSmart Case/
 **Depois: módulos.** Cada responsabilidade com o seu `build.gradle.kts`, as suas dependências e os seus testes.
 
 ```text
-MiboSmart Case/
-├─ build-logic/convention/               plugins casa.kmp.library e casa.kmp.compose
-├─ core/                                 sem tela
-│  ├─ domain/                            domain/ (igual) + AppScope.kt               18 testes
-│  ├─ data/                              data/, Keystore/Keychain, DataModule.kt,
-│  │                                     GdiBuildConfig                              57 testes
-│  ├─ ui/                                Components, Theme, MiboLogic, platform/      5 testes
-│  ├─ player/                            CameraPlayer expect/actual (libVLC, VLCKit)
-│  └─ testing/                           TestSupport.kt (os fakes, só para testes)
-├─ feature/                              uma tela por módulo, cada uma com
-│  │                                     ViewModel + rota + NavGraphBuilder.xScreen() + módulo Koin
-│  ├─ token/                             TokenScreen,  TokenViewModel                 7 testes
-│  ├─ home/                              HomeShell,    HomeViewModel                  7 testes
-│  ├─ camera/                            CameraScreen, CameraViewModel                3 testes
-│  └─ device/                            DeviceScreen, DeviceViewModel                9 testes
-├─ shared/                               umbrella: App.kt (só o NavHost), Koin.kt (só a lista),
-│                                        MainViewController, framework Shared
-├─ androidApp/                           igual (+ core:domain para o teste em Java)
-└─ iosApp/                               igual
+MiboSmart Case/                          o quê              conteúdo
+├─ settings.gradle.kts                   lista dos módulos  include(":core:domain"), …, includeBuild("build-logic")
+├─ build-logic/convention/               build incluído     plugins casa.kmp.library, casa.kmp.compose e casa.kmp.feature
+├─ core/                                 pasta              só agrupa; sem build.gradle.kts, sem código
+│  ├─ domain/                            MÓDULO             domain/ (igual) + AppScope.kt                        18 testes
+│  ├─ data/                              MÓDULO             data/, Keystore/Keychain, DataModule.kt,
+│  │                                                        GdiBuildConfig                                       57 testes
+│  ├─ ui/                                MÓDULO             Components, Theme, MiboLogic, platform/               5 testes
+│  ├─ player/                            MÓDULO             CameraPlayer expect/actual (libVLC, VLCKit)
+│  └─ testing/                           MÓDULO             TestSupport.kt (os fakes, só para testes)
+├─ feature/                              pasta              só agrupa; uma tela por módulo, cada uma com
+│  │                                                        ViewModel + rota + NavGraphBuilder.xScreen() + módulo Koin
+│  │                                                        + <Tela>UiTest em commonTest (simulador iOS e aparelho Android)
+│  ├─ token/                             MÓDULO             TokenScreen,  TokenViewModel,  TokenScreenUiTest   7 un. + 5 UI
+│  ├─ home/                              MÓDULO             HomeShell,    HomeViewModel,   HomeShellUiTest     7 un. + 5 UI
+│  ├─ camera/                            MÓDULO             CameraScreen, CameraViewModel, CameraScreenUiTest  3 un. + 5 UI
+│  └─ device/                            MÓDULO             DeviceScreen, DeviceViewModel, DeviceScreenUiTest  9 un. + 5 UI
+├─ shared/                               MÓDULO (umbrella)  App.kt (só o NavHost), Koin.kt (só a lista),
+│                                                           MainViewController, framework Shared
+├─ androidApp/                           MÓDULO (app)       MainActivity, CasaApplication, teste em Java (4)
+└─ iosApp/                               projeto Xcode      não é Gradle; consome o framework Shared
+
+MÓDULO = subprojeto Gradle: pasta com build.gradle.kts própria, registrada no settings.gradle.kts,
+compilada em separado e que só enxerga o que declara em dependencies. São 11.
+Testes: 106 unitários (JVM do host e simulador iOS) + 20 de UI (simulador iOS e Moto, instrumentados) + 4 em Java.
 ```
 
 Sentido das dependências: `androidApp`/`iosApp` → `shared` → `feature/*` → `core/ui` (e `core/player` na câmera) → `core/domain`; `core/data` → `core/domain`; `core/testing` só nos `commonTest`.
@@ -88,20 +94,20 @@ Linhas contadas em `.kt`/`.kts` de `src/`, sem os `build.gradle.kts`. "Origem" d
 
 | Módulo | Plugin | Código | Testes | Nº de testes | Depende de | Origem |
 |---|---|---:|---:|---:|---|---|
-| `build-logic` | (build incluído) | 99 | — | — | catálogo `libs` | novo |
+| `build-logic` | (build incluído) | 209 | — | — | catálogo `libs` | novo |
 | `:core:domain` | `casa.kmp.library` | 394 | 334 | 18 | nada | `domain/` idêntico + `AppScope.kt` novo |
 | `:core:data` | `casa.kmp.library` | 995 | 1 398 | 57 | domain | `data/`, `di/PlatformModule.*` idênticos + `DataModule.kt` novo |
 | `:core:ui` | `casa.kmp.compose` | 416 | 95 | 5 | domain | `ui/{Components,MiboLogic,Theme}`, `platform/` idênticos |
 | `:core:player` | `casa.kmp.compose` | 250 | — | — | nada (libVLC no Android) | `player/` idêntico |
 | `:core:testing` | `casa.kmp.library` | 199 | — | — | domain | `commonTest/TestSupport.kt` (menos um helper) |
-| `:feature:token` | `casa.kmp.compose` | 287 | 153 | 7 | domain, ui | `ui/TokenScreen.kt` + ViewModel extraído |
-| `:feature:home` | `casa.kmp.compose` | 910 | 133 | 7 | domain, ui | `ui/HomeShell.kt` + ViewModel extraído |
-| `:feature:camera` | `casa.kmp.compose` | 542 | 104 | 3 | domain, ui, player | `ui/CameraScreen.kt` + ViewModel extraído |
-| `:feature:device` | `casa.kmp.compose` | 1 031 | 178 | 9 | domain, ui | `ui/DeviceScreen.kt` + ViewModel extraído |
+| `:feature:token` | `casa.kmp.feature` | 287 | 273 | 7 + 5 UI | domain, ui | `ui/TokenScreen.kt` + ViewModel extraído |
+| `:feature:home` | `casa.kmp.feature` | 910 | 264 | 7 + 5 UI | domain, ui | `ui/HomeShell.kt` + ViewModel extraído |
+| `:feature:camera` | `casa.kmp.feature` | 542 | 275 | 3 + 5 UI | domain, ui, player | `ui/CameraScreen.kt` + ViewModel extraído |
+| `:feature:device` | `casa.kmp.feature` | 1 031 | 356 | 9 + 5 UI | domain, ui | `ui/DeviceScreen.kt` + ViewModel extraído |
 | `:shared` | `casa.kmp.compose` | 105 | — | — | todos | `App.kt`, `di/Koin.kt`, `MainViewController.kt` reescritos/mantidos |
 | `:androidApp` | AGP application | — | — | 4 (Java) | shared, domain | 1 linha nova no `build.gradle.kts` |
 
-Total: 106 testes Kotlin (JVM do host e simulador iOS) + 4 em Java, todos verdes depois da divisão. O `HomeViewModel` único (165 linhas) e o seu `HomeViewModelTest` (204 linhas) deixaram de existir: viraram quatro ViewModels e quatro classes de teste, uma por feature.
+Total: 106 testes unitários Kotlin (JVM do host e simulador iOS) + 20 testes de UI (simulador iOS e aparelho Android, desde 15/10/2026) + 4 em Java, todos verdes. O `HomeViewModel` único (165 linhas) e o seu `HomeViewModelTest` (204 linhas) deixaram de existir: viraram quatro ViewModels e quatro classes de teste, uma por feature.
 
 ## `build-logic/` (plugins de convenção)
 
@@ -113,7 +119,10 @@ Build incluído por `pluginManagement { includeBuild("build-logic") }` no `setti
 | `convention/build.gradle.kts` | 24 | `kotlin-dsl`; `compileOnly` dos marcadores dos plugins (KGP, AGP KMP, Compose, compilador Compose, serialização) e o jar dos acessores do catálogo, para o código Kotlin do plugin enxergar `libs` |
 | `convention/src/main/kotlin/br/com/pompeo/casa/buildlogic/KmpLibrary.kt` | 45 | `fun Project.configureKmpLibrary()`: alvos `iosArm64`, `iosSimulatorArm64` e o alvo Android do AGP 9 (`KotlinMultiplatformAndroidLibraryTarget`) com `namespace` derivado do caminho do módulo (`:core:data` → `br.com.pompeo.casa.core.data`), `compileSdk`/`minSdk` do catálogo, JVM 11, `withHostTest {}` (testes na JVM do host); coroutines em `commonMain`, `kotlin.test` + `coroutines-test` em `commonTest` |
 | `convention/src/main/kotlin/casa.kmp.library.gradle.kts` | 14 | aplica KGP + AGP KMP e chama `configureKmpLibrary()`. Para módulos sem tela |
-| `convention/src/main/kotlin/casa.kmp.compose.gradle.kts` | 40 | o anterior + `org.jetbrains.compose`, compilador Compose e `kotlinx-serialization`; em `commonMain`: runtime/foundation/material3/ui do Compose, ícones, `lifecycle-runtime-compose`, `lifecycle-viewmodel-compose`, `navigation-compose`, `kotlinx-serialization-json`, `koin-core`, `koin-compose-viewmodel`. Para `core/ui`, `core/player`, as features e o umbrella |
+| `convention/src/main/kotlin/br/com/pompeo/casa/buildlogic/ComposeMultiplatform.kt` | 33 | `fun Project.configureComposeMultiplatform()`: em `commonMain`, runtime/foundation/material3/ui do Compose, ícones, `lifecycle-runtime-compose`, `lifecycle-viewmodel-compose`, `navigation-compose`, `kotlinx-serialization-json`, `koin-core`, `koin-compose-viewmodel` |
+| `convention/src/main/kotlin/br/com/pompeo/casa/buildlogic/ComposeUiTests.kt` | 62 | `fun Project.configureComposeUiTests()`: `ui-test` do Compose Multiplatform em `commonTest`; `withDeviceTestBuilder { sourceSetTreeName = "test" }` para o `androidDeviceTest` compilar o `commonTest` como teste instrumentado (runner `AndroidJUnitRunner`, `ui-test-junit4-android`, `ui-test-manifest`); classes `*UiTest` excluídas de `testAndroidHostTest` (na JVM não há Activity); valores padrão para a task de `composeResources` da variante de teste, que o Compose 1.12.1 registra sem configurar |
+| `convention/src/main/kotlin/casa.kmp.compose.gradle.kts` | 20 | aplica KGP + AGP KMP + `org.jetbrains.compose` + compilador Compose + `kotlinx-serialization`; `configureKmpLibrary()` e `configureComposeMultiplatform()`. Para `core/ui`, `core/player` e o umbrella |
+| `convention/src/main/kotlin/casa.kmp.feature.gradle.kts` | 35 | os mesmos plugins; `configureKmpLibrary()`, `configureComposeMultiplatform()` e `configureComposeUiTests()`; `api(:core:domain)`, `implementation(:core:ui)` e, em `commonTest`, `:core:testing`. Para as quatro features |
 
 Por que uma função Kotlin e não um plugin aplicando o outro: plugin pré-compilado que aplica outro plugin pré-compilado não gera os acessores `kotlin { }` para quem o consome. Por isso cada módulo Compose declara `alias(libs.plugins.kotlinMultiplatform)` ao lado de `id("casa.kmp.compose")`, só para o Gradle gerar os acessores do script. Armadilha registrada: um comentário com "feature/" seguido de asterisco dentro de `/* */` aninha o comentário em Kotlin e engole o script inteiro, silenciosamente.
 
@@ -205,7 +214,7 @@ Pacote `br.com.pompeo.casa.feature.token`. `TokenScreen.kt` veio de `shared/.../
 | `TokenViewModel.kt` | 55 | `TokenViewModel(tokens: TokenRepository, submitTokenUseCase, errors)`: `suggestedToken`, `tokenValidation: StateFlow<TokenValidation>` (`Idle`/`Validating`/`Done`/`Failed`), `submitToken(raw)` em `viewModelScope` (2.º toque ignorado), `tokenValidationHandled()` |
 | `TokenNavigation.kt` | 30 | `@Serializable object TokenRoute`; `fun NavGraphBuilder.tokenScreen(onConnected: () -> Unit)` com `koinViewModel<TokenViewModel>()`; `val tokenFeatureModule = module { factoryOf(::SubmitTokenUseCase); viewModelOf(::TokenViewModel) }` |
 
-O que saiu do antigo `HomeViewModel`: `TokenValidation`, `submitToken`, `tokenValidationHandled`, `suggestedToken`. Dependências: `api(:core:domain)`, `implementation(:core:ui)`. Testes (7, `TokenViewModelTest`): validação em `viewModelScope`, Done/Failed, segundo toque ignorado, cancelamento ao limpar o ViewModel.
+O que saiu do antigo `HomeViewModel`: `TokenValidation`, `submitToken`, `tokenValidationHandled`, `suggestedToken`. Dependências: `api(:core:domain)`, `implementation(:core:ui)`. Testes (7, `TokenViewModelTest`): validação em `viewModelScope`, Done/Failed, segundo toque ignorado, cancelamento ao limpar o ViewModel. Testes de UI (5, `TokenScreenUiTest.kt`, 120 linhas): título e "Entrar" desabilitado com o campo vazio; habilita só a partir do 8.º caractere; token aceito pelo fake chama `onConnected` e persiste; token recusado mostra "Token inválido ou expirado…" e fica na tela; o olho alterna "Mostrar token"/"Ocultar token" e o campo passa da máscara ao texto.
 
 ## `feature/home` (RF02, RF07, RF08)
 
@@ -217,7 +226,7 @@ Pacote `br.com.pompeo.casa.feature.home`. `HomeShell.kt` veio de `shared/.../ui/
 | `HomeViewModel.kt` | 62 | `HomeViewModel(repository: DeviceRepository, tokens: TokenRepository, errors)`: `state`, `query`, `devices`, `token`, `providerNames`, `providerName(device)`, `maskedToken()`, `refresh()`, `loadMore()`, `setOrigin()`, `setPageSize()`, `logout()`, `messageOf()`/`shortMessageOf()`, e `notice`, emitido no `init` quando há token e `!tokens.persisted` ("token válido, mas não gravado") |
 | `HomeNavigation.kt` | 30 | `@Serializable object HomeRoute`; `fun NavGraphBuilder.homeScreen(onCamera: (Device) -> Unit, onDevice: (Device) -> Unit, onLogout: () -> Unit)`, que chama `vm.logout()` antes do callback; `val homeFeatureModule = module { viewModelOf(::HomeViewModel) }` |
 
-Mudança de dono: o aviso de token não persistido era emitido pelo fluxo do token; como token e Home viraram features diferentes, a Home passou a derivá-lo de `tokens.persisted`. Dependências: `api(:core:domain)`, `implementation(:core:ui)`. Testes (7, `HomeViewModelTest`, repartidos do antigo `HomeViewModelTest`): aviso no `init`, logout, delegação ao repositório, mapeamento de erro.
+Mudança de dono: o aviso de token não persistido era emitido pelo fluxo do token; como token e Home viraram features diferentes, a Home passou a derivá-lo de `tokens.persisted`. Dependências: `api(:core:domain)`, `implementation(:core:ui)`. Testes (7, `HomeViewModelTest`, repartidos do antigo `HomeViewModelTest`): aviso no `init`, logout, delegação ao repositório, mapeamento de erro. Testes de UI (5, `HomeShellUiTest.kt`, 131 linhas): os nomes da página carregada aparecem com o rodapé de paginação; página vazia sob filtro mostra "Nenhum dispositivo encontrado" e o chip "Vinculados" chama `setOrigin`; "Carregar mais" aparece com `hasMore` e chama `loadMore`; cartão de câmera → `onCamera`, os outros → `onDevice`; aba Definições → "Sair" chama `onLogout`. Como a Home não dispara o carregamento (quem o faz é o repositório), o teste usa um decorador local do fake com o estado já pronto.
 
 ## `feature/camera` (RF03)
 
@@ -229,7 +238,7 @@ Pacote `br.com.pompeo.casa.feature.camera`. `CameraScreen.kt` veio de `shared/..
 | `CameraViewModel.kt` | 45 | `CameraViewModel(repository, errors, appScope: CoroutineScope)`: `devices`, `startLive(device, lens)` (relança cancelamento), `stopLive(session)` lançado no `appScope`, para o `stopLive` chegar à API mesmo com o ViewModel da tela já limpo |
 | `CameraNavigation.kt` | 33 | `@Serializable data class CameraRoute(val ns: String)`; `fun NavGraphBuilder.cameraScreen(onBack: (NavBackStackEntry) -> Unit)`; `val cameraFeatureModule = module { viewModel { CameraViewModel(get(), get(), get(named(APP_SCOPE_NAME))) } }` |
 
-Dependências: `api(:core:domain)`, `implementation(:core:ui)`, `implementation(:core:player)`. Testes (3): `CameraViewModelTest` 2 (`startLive` relança cancelamento; `stopLiveRunsInAppScopeAndSurvivesTheViewModel`), `CameraFormatTest` 1.
+Dependências: `api(:core:domain)`, `implementation(:core:ui)`, `implementation(:core:player)`. Testes (3): `CameraViewModelTest` 2 (`startLive` relança cancelamento; `stopLiveRunsInAppScopeAndSurvivesTheViewModel`), `CameraFormatTest` 1. Testes de UI (5, `CameraScreenUiTest.kt`, 171 linhas): nome, selo "1/1" e etapa "Solicitando sessão à Intelbras" enquanto a sessão está pendente; falha mostra a mensagem e "Tentar novamente" repete o pedido; PTZ, gravação e multiview avisam que não existem na GDI; "Lente fixa" pede o canal 1 numa câmera dual; voltar chama `onBack`. O player nunca é composto: o `startLive` do fake fica pendente (`awaitCancellation`) ou falha, e a tela é hospedada num `Box` de 360 × 720 dp para caber no canvas paisagem do simulador.
 
 ## `feature/device` (RF05, RF06, RF09)
 
@@ -241,7 +250,7 @@ Pacote `br.com.pompeo.casa.feature.device`. `DeviceScreen.kt` veio de `shared/..
 | `DeviceViewModel.kt` | 122 | `LockAction` (`Door`, `Volume`), `LockCommand` (`Sending`, `Done(error, appliedVolume)`); `DeviceViewModel(repository, changeLockVolumeUseCase, errors, appScope, commandState: MutableStateFlow<LockCommand?>)`: `devices`, `lockCommand`, `sendDoorCommand(lock, open)`, `changeLockVolume(lock, volume)`, `lockCommandHandled()`, histórico com `HISTORY_FIRST = 10` e `HISTORY_MORE = 30`. Os comandos rodam no `appScope` e a trava "um comando por vez" é o `commandState` compartilhado |
 | `DeviceNavigation.kt` | 45 | `@Serializable data class DeviceRoute(val ns: String)`; `fun NavGraphBuilder.deviceScreen(onBack: (NavBackStackEntry) -> Unit)`; `val deviceFeatureModule = module { factoryOf(::ChangeLockVolumeUseCase); single(named("lockCommandState")) { MutableStateFlow<LockCommand?>(null) }; viewModel { DeviceViewModel(get(), get(), get(), get(named(APP_SCOPE_NAME)), get(named("lockCommandState"))) } }` |
 
-Por que o estado do comando é um `single` do Koin e não um campo do ViewModel: o ViewModel agora é por tela (nasce ao abrir o detalhe, morre ao voltar). Se a trava vivesse nele, abrir e fechar a tela durante um comando permitiria um segundo comando. Dependências: `api(:core:domain)`, `implementation(:core:ui)`. Testes (9, `DeviceViewModelTest`): comandos da fechadura e do volume no escopo do app (um por vez, erro, volume aplicado), `theInFlightGuardIsSharedBetweenViewModelInstances`, histórico 10/30.
+Por que o estado do comando é um `single` do Koin e não um campo do ViewModel: o ViewModel agora é por tela (nasce ao abrir o detalhe, morre ao voltar). Se a trava vivesse nele, abrir e fechar a tela durante um comando permitiria um segundo comando. Dependências: `api(:core:domain)`, `implementation(:core:ui)`. Testes (9, `DeviceViewModelTest`): comandos da fechadura e do volume no escopo do app (um por vez, erro, volume aplicado), `theInFlightGuardIsSharedBetweenViewModelInstances`, histórico 10/30. Testes de UI (5, `DeviceScreenUiTest.kt`, 178 linhas): fechadura com "Porta fechada", bateria, "Online" e "Pressione e segure para abrir a porta."; toque simples não abre nada, segurar abre "Destrancar a fechadura?", "Cancelar" não envia comando e "Confirmar" envia exatamente um ao `FakeLockController` (dublê, nunca a API); cartão Volume com Mudo/Baixo/Médio/Alto e confirmação "Alterar o volume para Alto?"; histórico abre com 10 eventos e "Ver mais" pede 30; hub lista os filhos e o diálogo de firmware consulta a versão.
 
 ## `shared` (umbrella)
 
@@ -262,6 +271,7 @@ O único módulo que conhece todos os outros. Monta o grafo de navegação e o K
 
 ## Verificação
 
-- Testes: `./gradlew testAndroidHostTest` (106 verdes na JVM do host) e `./gradlew iosSimulatorArm64Test` (os mesmos 106 no simulador iOS); `./gradlew :androidApp:testDebugUnitTest` (4 em Java).
+- Testes unitários: `./gradlew testAndroidHostTest` (106 verdes na JVM do host) e `./gradlew iosSimulatorArm64Test` (os mesmos 106 mais os 20 de UI no simulador iOS); `./gradlew :androidApp:testDebugUnitTest` (4 em Java).
+- Testes de UI no aparelho Android: `./gradlew :feature:<nome>:connectedAndroidDeviceTest` instala o APK de teste da feature no aparelho conectado e roda os unitários e os de UI dela como instrumentados (ver "Testes de UI" no README). Executado em 15/10/2026 no Moto G9 Play: token 12, Home 12, câmera 8, dispositivo 14 testes (20 de UI + 26 unitários), 0 falhas, em 2 min 58 s; os mesmos 20 de UI verdes no simulador iOS. Detalhes no [LOG §7](sdd/LOG.md).
 - Regras de dependência, conferidas por `grep` vazio: nenhum `import br.com.pompeo.casa.feature.` dentro de `feature/*` apontando para outra feature; nenhum `import br.com.pompeo.casa.data.` em `feature/*`; nenhum `import br.com.pompeo.casa.feature.` em `core/*`; nenhum `projects.feature` fora de `shared/build.gradle.kts`.
 - Aparelhos (14/10/2026, token novo no `local.properties`): no Moto G9 Play, token → Home com os 3 dispositivos → MFR 2030 ("Porta fechada", bateria, Online, histórico) → MCA 1002 (Online, "Firmware 2.4.628243") → iM4 Dual ("AO VIVO", "1º quadro em 81,1 s" a frio), sem nenhum crash no logcat; no iPhone 13 Pro, Home e iM4 Dual "AO VIVO" ("1º quadro em 42,7 s") depois de trocar o token na tela. Nenhum comando de fechadura ou de volume foi enviado. Linha 20 da tabela "Verificação em aparelho" do README.

@@ -1,5 +1,7 @@
 [versions]
 agp = "9.1.1"
+androidx-compose = "1.12.1"           # Jetpack Compose que o Compose Multiplatform 1.12.1 resolve no Android (ui-test-junit4, ui-test-manifest)
+androidx-test-runner = "1.6.2"
 android-compileSdk = "37"
 android-minSdk = "26"
 android-targetSdk = "37"
@@ -19,6 +21,9 @@ libvlc = "3.7.7"
 
 [libraries]
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
+androidx-compose-uiTestJunit4 = { module = "androidx.compose.ui:ui-test-junit4-android", version.ref = "androidx-compose" }
+androidx-compose-uiTestManifest = { module = "androidx.compose.ui:ui-test-manifest", version.ref = "androidx-compose" }
+androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test-runner" }
 androidx-lifecycle-runtimeCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose", version.ref = "androidx-lifecycle" }
 androidx-lifecycle-viewmodelCompose = { module = "org.jetbrains.androidx.lifecycle:lifecycle-viewmodel-compose", version.ref = "androidx-lifecycle" }
 compose-foundation = { module = "org.jetbrains.compose.foundation:foundation", version.ref = "compose-multiplatform" }
@@ -27,6 +32,7 @@ compose-material-icons-extended = { module = "org.jetbrains.compose.material:mat
 compose-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "compose-material3" }
 compose-runtime = { module = "org.jetbrains.compose.runtime:runtime", version.ref = "compose-multiplatform" }
 compose-ui = { module = "org.jetbrains.compose.ui:ui", version.ref = "compose-multiplatform" }
+compose-uiTest = { module = "org.jetbrains.compose.ui:ui-test", version.ref = "compose-multiplatform" }
 compose-uiTooling = { module = "org.jetbrains.compose.ui:ui-tooling", version.ref = "compose-multiplatform" }
 compose-uiToolingPreview = { module = "org.jetbrains.compose.ui:ui-tooling-preview", version.ref = "compose-multiplatform" }
 junit = { module = "junit:junit", version.ref = "junit" }

@@ -155,6 +155,9 @@ dl.terms dd { margin: 0; min-width: 0; }
   .clock { font-size: 2rem; }
 }
 @media (prefers-reduced-motion: reduce) { .bar > span { transition: none; } }
+.figure { margin: 14px 0 0; }
+.figure svg { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+.figure figcaption { font-size: 0.86rem; color: var(--muted); margin-top: 6px; }
 </style>
 
 <nav class="nav" aria-label="Seções">
@@ -170,6 +173,7 @@ dl.terms dd { margin: 0; min-width: 0; }
       <a href="#extras">AWS e vídeo</a>
       <a href="#kotlin">Kotlin</a>
       <a href="#kmp">KMP</a>
+      <a href="#modular">Modular</a>
       <a href="#siglas">Siglas</a>
       <a href="#checklist">Checklist</a>
     </div>
@@ -1133,21 +1137,21 @@ a=rtpmap:97 MPEG4-GENERIC/16000</pre>
       <h2>KMP: o que tem dentro</h2>
       <p>Regra, dados e telas no comum; nas plataformas, só o nativo.</p>
     </div>
-<pre class="tree">shared/src/
-├─ commonMain/   ~90% do app
-│   ├─ App.kt              tema + rotas tipadas + NavHost
-│   ├─ di/Koin.kt          interface → implementação; expect platformModule
-│   ├─ domain/             modelos, AppError, interfaces, 2 casos de uso
-│   ├─ data/ + data/gdi/   repositórios, GdiApi (Ktor), parser, erros
-│   ├─ ui/                 HomeViewModel + telas Compose + FitText
-│   ├─ player/             expect fun CameraPlayer(...)
-│   └─ platform/           expect: isDebugBuild, calendário
-├─ androidMain/  Keystore, libVLC (AndroidView), java.time
-├─ iosMain/      MainViewController, Keychain (cinterop),
-│                CameraPlayer.ios + NativeVideoPlayer (interface)
-└─ commonTest/   91 testes (JVM + simulador iOS)
-androidApp/  CasaApplication.java, MainActivity, teste JUnit Java
-iosApp/      iOSApp.swift, ContentView.swift, VLCVideoPlayer.swift</pre>
+<pre class="tree">core/          sem tela (5 módulos)
+├─ domain/     modelos, AppError, interfaces, 2 casos de uso   18 testes
+├─ data/       repositórios, GdiApi (Ktor), parser, erros,
+│              Keystore/Keychain, dataModule do Koin           57 testes
+├─ ui/         componentes, tema, calendário, isDebugBuild      5 testes
+├─ player/     expect fun CameraPlayer (libVLC / VLCKit)
+└─ testing/    fakes das interfaces (só nos testes)
+feature/       uma tela por módulo (4): tela + ViewModel + rota + Koin
+├─ token/  home/  camera/  device/        7+5, 7+5, 3+5, 9+5 (un. + UI)
+shared/        montador: App.kt (NavHost), di/Koin.kt (lista),
+               MainViewController; gera o framework Shared
+androidApp/    CasaApplication.java, MainActivity, 4 testes Java
+iosApp/        iOSApp.swift, ContentView.swift, VLCVideoPlayer.swift
+build-logic/   plugins casa.kmp.library · compose · feature
+Testes: 106 unitários (JVM + simulador iOS) + 20 de UI (simulador + Moto)</pre>
     <details class="group searchable" open>
       <summary>Os 4 usos de expect/actual</summary>
       <dl class="terms">
@@ -1164,6 +1168,76 @@ iosApp/      iOSApp.swift, ContentView.swift, VLCVideoPlayer.swift</pre>
         <div><dt>Android</dt><dd>O <code>shared</code> vira bytecode JVM; a <code>MainActivity</code> chama <code>setContent { App() }</code>.</dd></div>
         <div><dt>iOS</dt><dd>Kotlin/Native compila o framework estático <code>Shared</code>. No Xcode, "Compile Kotlin Framework" roda <code>embedAndSignAppleFrameworkForXcode</code> antes do Swift, que faz <code>import Shared</code>.</dd></div>
         <div><dt>Export Swift</dt><dd>Função de topo → <code>ArquivoKt.funcao()</code>; <code>object</code> → <code>.shared</code>; <code>Int</code> → <code>Int32</code>; <code>init…</code> → <code>doInit…</code>.</dd></div>
+      </dl>
+    </details>
+  </section>
+
+  <!-- MODULAR -->
+  <section id="modular">
+    <div class="section-head">
+      <h2>Modular: o que é, num desenho</h2>
+      <p>Módulo é um tijolo com parede própria e uma lista explícita de quem ele pode tocar.</p>
+    </div>
+    <figure class="figure">
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="400" viewBox="0 0 680 400" role="img" aria-labelledby="t d">
+<title id="t">Um bloco só contra módulos com parede</title>
+<desc id="d">À esquerda, um módulo único onde oito partes se alcançam por linhas cruzadas e a tela Home chama o Ktor sem ninguém impedir. À direita, onze módulos como tijolos com paredes grossas e poucas setas, todas para baixo; a mesma tentativa da Home bate na parede de core/data.</desc>
+<defs><marker id="m" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<rect width="680" height="400" rx="12" fill="#FFFFFF"/>
+<text x="170" y="24" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#2C2C2A" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">Antes: um bloco só (shared)</text>
+<rect x="20" y="40" width="300" height="300" rx="12" fill="#F1EFE8" stroke="#888780" stroke-width="0.75"/>
+<g stroke="#B4B2A9" stroke-width="0.6" opacity="0.8">
+<line x1="100" y1="95" x2="240" y2="135"/><line x1="240" y1="95" x2="100" y2="135"/><line x1="100" y1="95" x2="240" y2="215"/><line x1="240" y1="95" x2="100" y2="255"/>
+<line x1="100" y1="135" x2="240" y2="255"/><line x1="240" y1="135" x2="100" y2="215"/><line x1="100" y1="215" x2="240" y2="255"/><line x1="240" y1="215" x2="100" y2="255"/>
+<line x1="100" y1="95" x2="100" y2="255"/><line x1="240" y1="95" x2="240" y2="255"/><line x1="100" y1="135" x2="240" y2="215"/><line x1="240" y1="135" x2="240" y2="215"/></g>
+<rect x="40" y="80" width="120" height="30" rx="6" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.75"/><text x="100.0" y="95.0" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#26215C" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">Tela Token</text>
+<rect x="180" y="80" width="120" height="30" rx="6" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.75"/><text x="240.0" y="95.0" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#26215C" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">Tela Home</text>
+<rect x="40" y="120" width="120" height="30" rx="6" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.75"/><text x="100.0" y="135.0" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#26215C" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">Tela Câmera</text>
+<rect x="180" y="120" width="120" height="30" rx="6" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.75"/><text x="240.0" y="135.0" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#26215C" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">Tela Dispositivo</text>
+<rect x="40" y="200" width="120" height="30" rx="6" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.75"/><text x="100.0" y="215.0" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#04342C" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">Modelos e regras</text>
+<rect x="180" y="200" width="120" height="30" rx="6" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.75"/><text x="240.0" y="215.0" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#04342C" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">API Intelbras (Ktor)</text>
+<rect x="40" y="240" width="120" height="30" rx="6" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.75"/><text x="100.0" y="255.0" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#04342C" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">Player de vídeo</text>
+<rect x="180" y="240" width="120" height="30" rx="6" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.75"/><text x="240.0" y="255.0" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#04342C" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">Componentes visuais</text>
+<line x1="240" y1="110" x2="240" y2="196" stroke="#639922" stroke-width="2.5" marker-end="url(#m)"/>
+<text x="258" y="160" dominant-baseline="central" font-size="12" fill="#3B6D11" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">passa</text>
+<text x="170" y="300" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#5F5E5A" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">uma parede só, a de fora</text>
+<text x="170" y="318" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#5F5E5A" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">lá dentro, tudo alcança tudo</text>
+<text x="170" y="362" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#3B6D11" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">compila: ninguém impede a tela de chamar a rede</text>
+<text x="500" y="24" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#2C2C2A" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">Depois: módulos com parede</text>
+<rect x="360" y="60" width="64" height="40" rx="6" fill="#EEEDFE" stroke="#534AB7" stroke-width="2"/><text x="392.0" y="80.0" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#26215C" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">token</text>
+<rect x="432" y="60" width="64" height="40" rx="6" fill="#EEEDFE" stroke="#534AB7" stroke-width="2"/><text x="464.0" y="80.0" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#26215C" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">home</text>
+<rect x="504" y="60" width="64" height="40" rx="6" fill="#EEEDFE" stroke="#534AB7" stroke-width="2"/><text x="536.0" y="80.0" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#26215C" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">camera</text>
+<rect x="576" y="60" width="64" height="40" rx="6" fill="#EEEDFE" stroke="#534AB7" stroke-width="2"/><text x="608.0" y="80.0" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#26215C" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">device</text>
+<g stroke="#5F5E5A" stroke-width="1.5" fill="none"><line x1="392" y1="104" x2="392" y2="146" marker-end="url(#m)"/><line x1="464" y1="104" x2="464" y2="146" marker-end="url(#m)"/><line x1="536" y1="104" x2="536" y2="146" marker-end="url(#m)"/><line x1="600" y1="104" x2="556" y2="146" marker-end="url(#m)"/><line x1="616" y1="104" x2="616" y2="146" marker-end="url(#m)"/><line x1="460" y1="194" x2="500" y2="236" marker-end="url(#m)"/><line x1="464" y1="263" x2="474" y2="263" marker-end="url(#m)"/></g>
+<rect x="360" y="150" width="200" height="40" rx="6" fill="#E1F5EE" stroke="#0F6E56" stroke-width="2"/><text x="460.0" y="170.0" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#04342C" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">core/ui (componentes)</text>
+<rect x="576" y="150" width="64" height="40" rx="6" fill="#E1F5EE" stroke="#0F6E56" stroke-width="2"/><text x="608.0" y="170.0" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#04342C" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">player</text>
+<rect x="360" y="240" width="100" height="46" rx="6" fill="#E1F5EE" stroke="#0F6E56" stroke-width="2"/><text x="410.0" y="256.0" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#04342C" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">core/data</text><text x="410.0" y="271.0" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#04342C" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">API Intelbras</text>
+<rect x="478" y="240" width="92" height="46" rx="6" fill="#E1F5EE" stroke="#0F6E56" stroke-width="2"/><text x="524.0" y="256.0" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#04342C" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">core/domain</text><text x="524.0" y="271.0" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#04342C" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">regras</text>
+<rect x="580" y="240" width="60" height="46" rx="6" fill="#E1F5EE" stroke="#0F6E56" stroke-width="2"/><text x="610.0" y="256.0" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#04342C" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">testing</text><text x="610.0" y="271.0" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#04342C" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">dublês</text>
+<path d="M464 56 L464 44 L345 44 L345 263 L352 263" fill="none" stroke="#E24B4A" stroke-width="2.5" marker-end="url(#m)"/>
+<text x="345" y="263" text-anchor="middle" dominant-baseline="central" font-size="14" font-weight="600" fill="#E24B4A" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">✕</text>
+<text x="500" y="310" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#5F5E5A" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">borda grossa = parede do módulo</text>
+<text x="500" y="328" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#5F5E5A" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">seta = permissão escrita no build.gradle.kts</text>
+<text x="500" y="362" text-anchor="middle" dominant-baseline="central" font-size="12" fill="#A32D2D" font-family="-apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif">bate na parede: core/data não está nas dependências da home</text>
+</svg>
+      <figcaption>Antes, uma parede só: a de fora do <code>shared</code>. Depois, cada módulo tem a sua, e a seta é a linha <code>implementation(projects.core.ui)</code> no <code>build.gradle.kts</code>. Sem a seta, o compilador recusa.</figcaption>
+    </figure>
+    <details class="group searchable" open>
+      <summary>O que muda na prática (3 situações)</summary>
+      <dl class="terms">
+        <div><dt>Home chama o Ktor direto</dt><dd>Bloco único: compila. Modular: bate na parede, porque a Home só declara <code>core:domain</code> e <code>core:ui</code>. A regra deixa de ser combinada e passa a ser verificada pelo compilador (<code>Unresolved reference</code>).</dd></div>
+        <div><dt>Trocar a Intelbras por outro parceiro</dt><dd>Só <code>core/data</code> muda (mais um <code>DeviceProvider</code>); as telas nem recompilam.</dd></div>
+        <div><dt>Testar só a câmera</dt><dd>O Gradle compila a câmera e o que ela declara: <code>core/ui</code>, <code>player</code>, <code>domain</code>, <code>testing</code>. No bloco único, compila o app inteiro.</dd></div>
+      </dl>
+    </details>
+    <details class="group searchable">
+      <summary>Como saber o que é módulo, sem mudar nome</summary>
+      <dl class="terms">
+        <div><dt>Regra</dt><dd>Pasta com <code>build.gradle.kts</code> próprio e um <code>include</code> no <code>settings.gradle.kts</code>. <code>core/</code> e <code>feature/</code> só agrupam; <code>build-logic</code> é build incluído; <code>iosApp</code> é projeto Xcode.</dd></div>
+        <div><dt>Comando</dt><dd><code>./gradlew projects</code> lista os 11: 5 core, 4 feature, <code>shared</code> (montador) e <code>androidApp</code>.</dd></div>
+        <div><dt>Análogo .NET</dt><dd><code>settings.gradle.kts</code> = .sln; <code>build.gradle.kts</code> = .csproj; <code>implementation(projects.x)</code> = ProjectReference; pacote = namespace.</dd></div>
+        <div><dt>Frase de 1 minuto</dt><dd>Começa com um módulo; quebra em features quando crescer; uma base (domain + data) que as features consomem por interface; um umbrella que monta navegação e Koin e gera o framework do iOS; não fatiar demais num app pequeno.</dd></div>
+        <div><dt>Fontes</dt><dd>Doc KMP: um módulo é o ponto de partida, depois feature modules + umbrella (vários frameworks duplicam dependências). Guia Android: feature → data, mediador com IDs primitivos, cuidado com "too fine-grained". Clean Architecture: Dependency Rule, sem ciclos, depender na direção da estabilidade.</dd></div>
       </dl>
     </details>
   </section>

@@ -319,6 +319,10 @@ Só `core/data/gdi` conhece a GDI (rotas, nomes de campo, códigos de erro, form
 
 O app é dividido em módulos Gradle no padrão usado hoje no mercado (o mesmo do [Now in Android](https://github.com/android/nowinandroid), adaptado a KMP com o módulo umbrella que a JetBrains recomenda para o framework do iOS): **`core/*`** sem tela, **`feature/*`** com uma tela ou fluxo cada, **`shared`** como umbrella, e **plugins de convenção** num build incluído (`build-logic/`) para a configuração não se repetir.
 
+![Um bloco só contra módulos com parede: à esquerda, tudo alcança tudo e a tela da Home chama o Ktor; à direita, só passa o que está declarado em dependencies e a mesma tentativa bate na parede de core/data](docs/modular-paredes.svg)
+
+**Modular é parede.** Antes havia uma parede só, a de fora do `shared`: lá dentro qualquer arquivo importava qualquer outro, e a tela da Home podia chamar o Ktor. Agora cada módulo tem a própria parede e só passa o que está escrito como seta, isto é, uma linha `implementation(projects.core.ui)` no `build.gradle.kts` dele. Sem a seta, o compilador recusa (`Unresolved reference`). Na prática: trocar o parceiro mexe só em `core/data`, e testar a câmera compila só o que a câmera declara. Módulo é a pasta que tem `build.gradle.kts` próprio; `core/` e `feature/` só agrupam (`./gradlew projects` lista os 11).
+
 O detalhe módulo a módulo (arquivos, de onde cada um veio, API pública, dependências e testes) está em [docs/modularizacao.md](docs/modularizacao.md).
 
 | Módulo | Conteúdo | Depende de |
